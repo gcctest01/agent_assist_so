@@ -23,11 +23,6 @@
       margin-bottom: 10px;
       align-items: flex-start;
     }
-    .messageIcon {
-      width: 30px;
-      font-size: 20px;
-      margin-right: 8px;
-    }
     .message {
       border-radius: 6px;
       padding: 10px;
@@ -96,7 +91,7 @@
 </head>
 <body>
 
-<h2>Conversation avec l'Agent :</h2>
+<h2>Conversation avec l'Assistant Watson :</h2>
 <div id="messageContainer">
   <!-- Historique complet des messages -->
 </div>
@@ -125,15 +120,10 @@ if (!clientId) {
   localStorage.setItem("clientId", clientId);
 }
 
+// Fonction pour afficher un message dans le conteneur
 function appendMessage(message, type) {
   const wrapper = document.createElement("div");
   wrapper.className = "messageWrapper";
-
-  const icon = document.createElement("div");
-  icon.className = "messageIcon";
-  if(type === "client") icon.textContent = "🧑";       // Client
-  else if(type === "agent") icon.textContent = "👩‍💼"; // Agent
-  else if(type === "assistant") icon.textContent = "🤖"; // Assistant
 
   const msgDiv = document.createElement("div");
   msgDiv.className = "message";
@@ -143,7 +133,6 @@ function appendMessage(message, type) {
 
   msgDiv.textContent = message;
 
-  wrapper.appendChild(icon);
   wrapper.appendChild(msgDiv);
   messageContainer.appendChild(wrapper);
 
@@ -194,7 +183,7 @@ async function getWatsonSuggestions(messageClient) {
 
 // Envoi du message
 function sendMessageToWatson(message) {
-  appendMessage(message, "client");
+  appendMessage(message, "agent");
   getWatsonSuggestions(message);
   freeInput.value = "";
 }
@@ -225,7 +214,7 @@ if(api) {
   api.onCallMessageReceived = async function(event) {
     const call = event.Call || {};
     const msg = call.IMMessage || "Message inconnu";
-    appendMessage(msg, "agent");
+    appendMessage(msg, "client");
     await getWatsonSuggestions(msg);
   };
 }
