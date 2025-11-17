@@ -97,7 +97,7 @@
 
   <h2>Conversation avec l'Agent :</h2>
   <div id="messageContainer">
-    <!-- Messages de la conversation : client et agent -->
+    <!-- Seulement le dernier message sera affiché ici -->
   </div>
 
   <h3>Suggestions de réponses :</h3>
@@ -124,13 +124,14 @@
       localStorage.setItem("clientId", clientId);
     }
 
-    // Afficher un message (Client ou Agent)
-    function displayMessage(role, message) {
+    // Fonction pour afficher le dernier message (client ou agent)
+    function displayMessage(message) {
+      messageContainer.innerHTML = ''; // Vider le conteneur des anciens messages
       const div = document.createElement("div");
-      div.className = "message " + (role === "client" ? "clientMessage" : "agentMessage");
-      div.textContent = `${role === 'client' ? 'Client' : 'Agent'} : ${message}`;
+      div.className = "message";
+      div.textContent = message; // Afficher uniquement le message sans "Agent" ou "Client"
       messageContainer.appendChild(div);
-      messageContainer.scrollTop = messageContainer.scrollHeight;
+      messageContainer.scrollTop = messageContainer.scrollHeight; // Faire défiler vers le bas
     }
 
     // Récupérer les suggestions de Watson
@@ -155,22 +156,17 @@
           div.className = "suggestion-item";
           div.textContent = r;
 
-          // Ajout d'un bouton "Copier"
+          // Ajout d'un bouton "Passer" pour insérer dans l'éditeur de l'autre côté
           const copyBtn = document.createElement("button");
           copyBtn.className = "copyBtn";
-          copyBtn.textContent = "Copier";
-          
-          // Événement pour copier le message
+          copyBtn.textContent = "Passer";
+
+          // Action pour copier dans l'éditeur
           copyBtn.addEventListener("click", () => {
-            // Copier le texte de la suggestion dans le presse-papier
-            navigator.clipboard.writeText(r).then(() => {
-              alert("Message copié dans le presse-papier !");
-            }).catch(err => {
-              console.error("Erreur de copie dans le presse-papier", err);
-            });
+            displayMessage(r); // Insère le message directement dans le conteneur
+            alert("Message passé dans le conteneur !");
           });
 
-          // Ajouter le bouton à la suggestion
           div.appendChild(copyBtn);
           suggestionsList.appendChild(div);
         });
@@ -185,8 +181,8 @@
 
     // Fonction pour envoyer un message au serveur de Watson et récupérer la réponse
     function sendMessageToWatson(message) {
-      displayMessage("agent", message); // Afficher message agent
-      getWatsonSuggestions(message);     // Envoi message à Watson pour suggestions
+      displayMessage(message); // Afficher uniquement le message sans étiquettes
+      getWatsonSuggestions(message); // Envoi message à Watson pour suggestions
       freeInput.value = ""; // Reset input
     }
 
@@ -204,14 +200,6 @@
       }
     });
 
-    // Cliquer sur une suggestion pour l'envoyer
-    suggestionsList.addEventListener("click", (e) => {
-      if (e.target.classList.contains("suggestion-item")) {
-        const suggestion = e.target.textContent;
-        sendMessageToWatson(suggestion); // Envoyer la suggestion à Watson
-      }
-    });
-
     // 🎯 Recevoir un message du client via le SDK (API OneAgent)
     let api;
     if (typeof getAgentAPI === "function") {
@@ -224,18 +212,14 @@
       api.onCallMessageReceived = async function(event) {
         const call = event.Call || {};
         const msg = call.IMMessage || "Message inconnu";
-        const displayName = call.IMDisplayName || "Client";
 
-        // Affichage du message client
-        displayMessage("client", msg);
+        // Affichage du dernier message
+        displayMessage(msg);
 
         // Appel à Watson pour récupérer des suggestions
         await getWatsonSuggestions(msg);
       };
-    } else {
-      console.error("❌ Impossible d'initialiser l'API agent.");
     }
-
   </script>
 </body>
 </html>
