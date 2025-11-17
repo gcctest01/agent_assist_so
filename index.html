@@ -58,9 +58,7 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    #sendBtn:hover {
-      background: #0050b3;
-    }
+    #sendBtn:hover { background: #0050b3; }
   </style>
 </head>
 <body>
@@ -85,16 +83,13 @@
     const freeInput = document.getElementById("freeInput");
     const sendBtn = document.getElementById("sendBtn");
 
-    // Fonction pour envoyer un message au backend et récupérer la réponse Watsonx
     async function getWatsonSuggestions(messageClient) {
       suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
 
       try {
         const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: messageClient })
         });
 
@@ -103,10 +98,16 @@
         const data = await res.json();
 
         suggestionsList.innerHTML = "";
-        const div = document.createElement("div");
-        div.className = "suggestion-item";
-        div.textContent = data.reply;
-        suggestionsList.appendChild(div);
+        const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
+        replies.forEach(r => {
+          const div = document.createElement("div");
+          div.className = "suggestion-item";
+          div.textContent = r;
+          suggestionsList.appendChild(div);
+        });
+
+        // Scroll vers la dernière suggestion
+        suggestionsList.scrollTop = suggestionsList.scrollHeight;
 
       } catch (error) {
         console.error("Erreur récupération Watsonx:", error);
@@ -114,19 +115,25 @@
       }
     }
 
-    // Quand on clique sur "Envoyer"
-    sendBtn.addEventListener("click", async () => {
+    function sendMessage() {
       const messageClient = freeInput.value.trim();
-      if (messageClient === "") return;
+      if (!messageClient) return;
 
       clientMessageDiv.textContent = "Client : " + messageClient;
 
-      await getWatsonSuggestions(messageClient);
-
+      getWatsonSuggestions(messageClient);
       freeInput.value = "";
+    }
+
+    // Click sur le bouton
+    sendBtn.addEventListener("click", sendMessage);
+
+    // Touche Enter
+    freeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
     });
 
-    // Permet de cliquer sur une suggestion pour la tester
+    // Cliquer sur une suggestion
     suggestionsList.addEventListener("click", (e) => {
       if (e.target.classList.contains("suggestion-item")) {
         alert("Suggestion choisie : " + e.target.textContent);
