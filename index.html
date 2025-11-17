@@ -109,6 +109,7 @@
 
 <script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
 <script>
+// Variables globales
 const messageContainer = document.getElementById("messageContainer");
 const suggestionsList = document.getElementById("suggestionsList");
 const freeInput = document.getElementById("freeInput");
@@ -120,7 +121,10 @@ if (!clientId) {
   localStorage.setItem("clientId", clientId);
 }
 
-// Fonction pour afficher un message dans le conteneur
+// Historique des messages
+let conversationHistory = [];
+
+// Fonction pour afficher un message dans l'historique de la conversation
 function appendMessage(message, type) {
   const wrapper = document.createElement("div");
   wrapper.className = "messageWrapper";
@@ -135,8 +139,18 @@ function appendMessage(message, type) {
 
   wrapper.appendChild(msgDiv);
   messageContainer.appendChild(wrapper);
-
   messageContainer.scrollTop = messageContainer.scrollHeight;
+}
+
+// Mettre à jour l'historique et afficher les messages
+function updateConversationHistory(message, type) {
+  conversationHistory.push({ message, type });
+
+  // Vider et redessiner l'historique
+  messageContainer.innerHTML = '';
+  conversationHistory.forEach(item => {
+    appendMessage(item.message, item.type);
+  });
 }
 
 // Récupérer les suggestions de Watson
@@ -183,7 +197,7 @@ async function getWatsonSuggestions(messageClient) {
 
 // Envoi du message
 function sendMessageToWatson(message) {
-  appendMessage(message, "agent");
+  updateConversationHistory(message, "agent");  // Ajouter le message de l'agent
   getWatsonSuggestions(message);
   freeInput.value = "";
 }
@@ -214,10 +228,11 @@ if(api) {
   api.onCallMessageReceived = async function(event) {
     const call = event.Call || {};
     const msg = call.IMMessage || "Message inconnu";
-    appendMessage(msg, "client");
+    updateConversationHistory(msg, "client");  // Ajouter le message du client
     await getWatsonSuggestions(msg);
   };
 }
 </script>
+
 </body>
 </html>
