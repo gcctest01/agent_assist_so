@@ -5,37 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistant Agent Assist - Watsonx Orchestrate</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 12px;
-      background: #f9f9f9;
-    }
+    body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
     h2 { color: #004080; }
     #messageContainer {
       display: flex;
       flex-direction: column;
-      max-height: 500px;
+      max-height: 400px;
       overflow-y: auto;
       margin-bottom: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #fff;
+      border-radius: 6px;
     }
     .message {
-      background: #e6f0ff;
       border-radius: 6px;
       padding: 10px;
       margin-bottom: 10px;
-      font-size: 16px;
-      color: #004080;
+      font-size: 15px;
       word-wrap: break-word;
       max-width: 70%;
     }
-    .clientMessage {
-      background: #e6f0ff;
-      text-align: left;
-    }
-    .agentMessage {
-      background: #cce5ff;
-      text-align: right;
-    }
+    .clientMessage { background: #e6f0ff; text-align: left; color: #004080; }
+    .agentMessage { background: #cce5ff; text-align: right; color: #004080; }
+    .assistantMessage { background: #d9f0ff; text-align: left; color: #004080; }
+
     .suggestion-item {
       padding: 10px;
       border-bottom: 1px solid #eee;
@@ -46,7 +40,6 @@
       align-items: center;
     }
     .suggestion-item:hover { background: #d0e1ff; }
-
     .copyBtn {
       background: #004080;
       color: white;
@@ -65,22 +58,8 @@
       border-radius: 6px;
       border: 1px solid #ccc;
     }
-    #freeInput {
-      width: 100%;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #aaa;
-      font-size: 15px;
-    }
-    #sendBtn {
-      margin-top: 10px;
-      padding: 10px 18px;
-      background: #004080;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+    #freeInput { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #aaa; font-size: 15px; }
+    #sendBtn { margin-top: 10px; padding: 10px 18px; background: #004080; color: white; border: none; border-radius: 6px; cursor: pointer; }
     #sendBtn:hover { background: #0050b3; }
 
     #suggestionsList {
@@ -90,6 +69,7 @@
       max-height: 200px;
       overflow-y: auto;
       padding: 8px;
+      margin-bottom: 20px;
     }
   </style>
 </head>
@@ -97,7 +77,7 @@
 
   <h2>Conversation avec l'Agent :</h2>
   <div id="messageContainer">
-    <!-- Seulement le dernier message sera affiché ici -->
+    <!-- Les derniers messages seront affichés ici -->
   </div>
 
   <h3>Suggestions de réponses :</h3>
@@ -117,27 +97,37 @@
     const suggestionsList = document.getElementById("suggestionsList");
     const freeInput = document.getElementById("freeInput");
     const sendBtn = document.getElementById("sendBtn");
-    
+
     let clientId = localStorage.getItem("clientId");
     if (!clientId) {
       clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       localStorage.setItem("clientId", clientId);
     }
 
-    // Fonction pour afficher le dernier message (client ou agent)
-    function displayMessage(message) {
-      messageContainer.innerHTML = ''; // Vider le conteneur des anciens messages
-      const div = document.createElement("div");
-      div.className = "message";
-      div.textContent = message; // Afficher uniquement le message sans "Agent" ou "Client"
-      messageContainer.appendChild(div);
-      messageContainer.scrollTop = messageContainer.scrollHeight; // Faire défiler vers le bas
+    // Historique simplifié, on garde le dernier message pour chaque acteur
+    let lastMessages = {
+      agent: null,
+      assistant: null,
+      client: null
+    };
+
+    function updateMessageContainer() {
+      messageContainer.innerHTML = "";
+      if (lastMessages.agent) appendMessage("Agent", lastMessages.agent, "agentMessage");
+      if (lastMessages.assistant) appendMessage("Assistant Watson", lastMessages.assistant, "assistantMessage");
+      if (lastMessages.client) appendMessage("Client", lastMessages.client, "clientMessage");
     }
 
-    // Récupérer les suggestions de Watson
+    function appendMessage(sender, text, className) {
+      const div = document.createElement("div");
+      div.className = `message ${className}`;
+      div.textContent = `${sender} : ${text}`;
+      messageContainer.appendChild(div);
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
     async function getWatsonSuggestions(messageClient) {
       suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
-
       try {
         const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
           method: "POST",
@@ -146,7 +136,6 @@
         });
 
         if (!res.ok) throw new Error("Erreur API Orchestrate");
-
         const data = await res.json();
 
         suggestionsList.innerHTML = "";
@@ -156,15 +145,14 @@
           div.className = "suggestion-item";
           div.textContent = r;
 
-          // Ajout d'un bouton "Passer" pour insérer dans l'éditeur de l'autre côté
           const copyBtn = document.createElement("button");
           copyBtn.className = "copyBtn";
           copyBtn.textContent = "Passer";
 
-          // Action pour copier dans l'éditeur
           copyBtn.addEventListener("click", () => {
-            displayMessage(r); // Insère le message directement dans le conteneur
-            alert("Message passé dans le conteneur !");
+            // On met le message de l'assistant comme dernier message et on met à jour l'affichage
+            lastMessages.assistant = r;
+            updateMessageContainer();
           });
 
           div.appendChild(copyBtn);
@@ -179,20 +167,19 @@
       }
     }
 
-    // Fonction pour envoyer un message au serveur de Watson et récupérer la réponse
     function sendMessageToWatson(message) {
-      displayMessage(message); // Afficher uniquement le message sans étiquettes
-      getWatsonSuggestions(message); // Envoi message à Watson pour suggestions
-      freeInput.value = ""; // Reset input
+      // On garde le dernier message du client
+      lastMessages.client = message;
+      updateMessageContainer();
+      freeInput.value = "";
+      getWatsonSuggestions(message);
     }
 
-    // Écouter le clic sur le bouton "Envoyer"
     sendBtn.addEventListener("click", () => {
       const message = freeInput.value.trim();
       if (message) sendMessageToWatson(message);
     });
 
-    // Envoi du message avec la touche "Enter"
     freeInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         const message = freeInput.value.trim();
@@ -200,7 +187,7 @@
       }
     });
 
-    // 🎯 Recevoir un message du client via le SDK (API OneAgent)
+    // Recevoir un message via le SDK OneAgent
     let api;
     if (typeof getAgentAPI === "function") {
       api = getAgentAPI();
@@ -212,11 +199,8 @@
       api.onCallMessageReceived = async function(event) {
         const call = event.Call || {};
         const msg = call.IMMessage || "Message inconnu";
-
-        // Affichage du dernier message
-        displayMessage(msg);
-
-        // Appel à Watson pour récupérer des suggestions
+        lastMessages.agent = msg;
+        updateMessageContainer();
         await getWatsonSuggestions(msg);
       };
     }
