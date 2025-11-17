@@ -75,135 +75,122 @@
 </head>
 <body>
 
-  <h2>Conversation avec l'Agent :</h2>
-  <div id="messageContainer">
-    <!-- Les derniers messages seront affichés ici -->
-  </div>
+<h2>Conversation avec l'Agent :</h2>
+<div id="messageContainer">
+  <!-- Tous les messages seront ajoutés ici -->
+</div>
 
-  <h3>Suggestions de réponses :</h3>
-  <div id="suggestionsList">
-    <div>Aucune suggestion pour le moment...</div>
-  </div>
+<h3>Suggestions de réponses :</h3>
+<div id="suggestionsList">
+  <div>Aucune suggestion pour le moment...</div>
+</div>
 
-  <div id="inputContainer">
-    <label for="freeInput"><strong>Saisir un message :</strong></label>
-    <input id="freeInput" type="text" placeholder="Écrire le message ici…">
-    <button id="sendBtn">Envoyer</button>
-  </div>
+<div id="inputContainer">
+  <label for="freeInput"><strong>Saisir un message :</strong></label>
+  <input id="freeInput" type="text" placeholder="Écrire le message ici…">
+  <button id="sendBtn">Envoyer</button>
+</div>
 
-  <script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
-  <script>
-    const messageContainer = document.getElementById("messageContainer");
-    const suggestionsList = document.getElementById("suggestionsList");
-    const freeInput = document.getElementById("freeInput");
-    const sendBtn = document.getElementById("sendBtn");
+<script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
+<script>
+const messageContainer = document.getElementById("messageContainer");
+const suggestionsList = document.getElementById("suggestionsList");
+const freeInput = document.getElementById("freeInput");
+const sendBtn = document.getElementById("sendBtn");
 
-    let clientId = localStorage.getItem("clientId");
-    if (!clientId) {
-      clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
-      localStorage.setItem("clientId", clientId);
-    }
+let clientId = localStorage.getItem("clientId");
+if (!clientId) {
+  clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+  localStorage.setItem("clientId", clientId);
+}
 
-    // Historique simplifié, on garde le dernier message pour chaque acteur
-    let lastMessages = {
-      agent: null,
-      assistant: null,
-      client: null
-    };
+// Fonction pour ajouter un message à l'historique
+function addMessage(sender, text, className) {
+  const div = document.createElement("div");
+  div.className = `message ${className}`;
+  div.textContent = `${sender} : ${text}`;
+  messageContainer.appendChild(div);
+  messageContainer.scrollTop = messageContainer.scrollHeight;
+}
 
-    function updateMessageContainer() {
-      messageContainer.innerHTML = "";
-      if (lastMessages.agent) appendMessage("Agent", lastMessages.agent, "agentMessage");
-      if (lastMessages.assistant) appendMessage("Assistant Watson", lastMessages.assistant, "assistantMessage");
-      if (lastMessages.client) appendMessage("Client", lastMessages.client, "clientMessage");
-    }
+// Récupérer les suggestions de Watson
+async function getWatsonSuggestions(messageClient) {
+  suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
+  try {
+    const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: messageClient, clientId })
+    });
 
-    function appendMessage(sender, text, className) {
+    if (!res.ok) throw new Error("Erreur API Orchestrate");
+
+    const data = await res.json();
+    suggestionsList.innerHTML = "";
+
+    const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
+    replies.forEach(r => {
       const div = document.createElement("div");
-      div.className = `message ${className}`;
-      div.textContent = `${sender} : ${text}`;
-      messageContainer.appendChild(div);
-      messageContainer.scrollTop = messageContainer.scrollHeight;
-    }
+      div.className = "suggestion-item";
+      div.textContent = r;
 
-    async function getWatsonSuggestions(messageClient) {
-      suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
-      try {
-        const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: messageClient, clientId })
-        });
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "copyBtn";
+      copyBtn.textContent = "Passer";
 
-        if (!res.ok) throw new Error("Erreur API Orchestrate");
-        const data = await res.json();
+      copyBtn.addEventListener("click", () => {
+        addMessage("Assistant Watson", r, "assistantMessage");
+      });
 
-        suggestionsList.innerHTML = "";
-        const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-        replies.forEach(r => {
-          const div = document.createElement("div");
-          div.className = "suggestion-item";
-          div.textContent = r;
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "copyBtn";
-          copyBtn.textContent = "Passer";
-
-          copyBtn.addEventListener("click", () => {
-            // On met le message de l'assistant comme dernier message et on met à jour l'affichage
-            lastMessages.assistant = r;
-            updateMessageContainer();
-          });
-
-          div.appendChild(copyBtn);
-          suggestionsList.appendChild(div);
-        });
-
-        suggestionsList.scrollTop = suggestionsList.scrollHeight;
-
-      } catch (error) {
-        console.error("Erreur récupération Watsonx:", error);
-        suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
-      }
-    }
-
-    function sendMessageToWatson(message) {
-      // On garde le dernier message du client
-      lastMessages.client = message;
-      updateMessageContainer();
-      freeInput.value = "";
-      getWatsonSuggestions(message);
-    }
-
-    sendBtn.addEventListener("click", () => {
-      const message = freeInput.value.trim();
-      if (message) sendMessageToWatson(message);
+      div.appendChild(copyBtn);
+      suggestionsList.appendChild(div);
     });
 
-    freeInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const message = freeInput.value.trim();
-        if (message) sendMessageToWatson(message);
-      }
-    });
+    suggestionsList.scrollTop = suggestionsList.scrollHeight;
 
-    // Recevoir un message via le SDK OneAgent
-    let api;
-    if (typeof getAgentAPI === "function") {
-      api = getAgentAPI();
-    } else if (typeof oneAgentSDK === "function") {
-      api = new oneAgentSDK();
-    }
+  } catch (error) {
+    console.error("Erreur récupération Watsonx:", error);
+    suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
+  }
+}
 
-    if (api) {
-      api.onCallMessageReceived = async function(event) {
-        const call = event.Call || {};
-        const msg = call.IMMessage || "Message inconnu";
-        lastMessages.agent = msg;
-        updateMessageContainer();
-        await getWatsonSuggestions(msg);
-      };
-    }
-  </script>
+// Envoyer un message
+function sendMessage(message) {
+  addMessage("Client", message, "clientMessage");
+  freeInput.value = "";
+  getWatsonSuggestions(message);
+}
+
+// Bouton Envoyer
+sendBtn.addEventListener("click", () => {
+  const message = freeInput.value.trim();
+  if (message) sendMessage(message);
+});
+
+// Touche Enter
+freeInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const message = freeInput.value.trim();
+    if (message) sendMessage(message);
+  }
+});
+
+// Recevoir un message via SDK OneAgent
+let api;
+if (typeof getAgentAPI === "function") {
+  api = getAgentAPI();
+} else if (typeof oneAgentSDK === "function") {
+  api = new oneAgentSDK();
+}
+
+if (api) {
+  api.onCallMessageReceived = async function(event) {
+    const call = event.Call || {};
+    const msg = call.IMMessage || "Message inconnu";
+    addMessage("Agent", msg, "agentMessage");
+    await getWatsonSuggestions(msg);
+  };
+}
+</script>
 </body>
 </html>
