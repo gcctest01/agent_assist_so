@@ -1,0 +1,70 @@
+<script>
+  const clientMessageDiv = document.getElementById("clientMessage");
+  const suggestionsList = document.getElementById("suggestionsList");
+  const freeInput = document.getElementById("freeInput");
+  const sendBtn = document.getElementById("sendBtn");
+
+  // 🔹 Créer ou récupérer un clientId unique pour la session
+  let clientId = localStorage.getItem("clientId");
+  if (!clientId) {
+    clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+    localStorage.setItem("clientId", clientId);
+  }
+
+  async function getWatsonSuggestions(messageClient) {
+    suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
+
+    try {
+      const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: messageClient, clientId })
+      });
+
+      if (!res.ok) throw new Error("Erreur API Orchestrate");
+
+      const data = await res.json();
+
+      suggestionsList.innerHTML = "";
+      const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
+      replies.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "suggestion-item";
+        div.textContent = r;
+        suggestionsList.appendChild(div);
+      });
+
+      // Scroll vers la dernière suggestion
+      suggestionsList.scrollTop = suggestionsList.scrollHeight;
+
+    } catch (error) {
+      console.error("Erreur récupération Watsonx:", error);
+      suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
+    }
+  }
+
+  function sendMessage() {
+    const messageClient = freeInput.value.trim();
+    if (!messageClient) return;
+
+    clientMessageDiv.textContent = "Client : " + messageClient;
+
+    getWatsonSuggestions(messageClient);
+    freeInput.value = "";
+  }
+
+  // Click sur le bouton
+  sendBtn.addEventListener("click", sendMessage);
+
+  // Touche Enter
+  freeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
+
+  // Cliquer sur une suggestion
+  suggestionsList.addEventListener("click", (e) => {
+    if (e.target.classList.contains("suggestion-item")) {
+      alert("Suggestion choisie : " + e.target.textContent);
+    }
+  });
+</script>
