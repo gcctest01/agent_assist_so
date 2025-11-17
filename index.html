@@ -20,7 +20,7 @@
       max-height: 500px;
       overflow-y: auto;
       margin-bottom: 20px;
-      white-space: pre-line;
+      white-space: pre-wrap;
       font-family: monospace;
     }
 
@@ -105,10 +105,8 @@ function appendMessage(sender, message) {
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
-// Fonction pour récupérer les suggestions de Watson et l’afficher comme Assistant Watson
-async function getWatsonSuggestions(message, senderType) {
-  suggestionsList.innerHTML = "<div>Chargement des suggestions...</div>";
-
+// Fonction pour récupérer la réponse de Watson
+async function getWatsonResponse(message, senderType) {
   try {
     const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
       method: "POST",
@@ -119,12 +117,14 @@ async function getWatsonSuggestions(message, senderType) {
     if (!res.ok) throw new Error("Erreur API Orchestrate");
 
     const data = await res.json();
-    suggestionsList.innerHTML = "";
-
     const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-    replies.forEach(r => {
-      appendMessage("Assistant Watson", r);
 
+    // Afficher chaque réponse de Watson
+    replies.forEach(r => appendMessage("Assistant Watson", r));
+
+    // Mettre les suggestions dans la liste cliquable
+    suggestionsList.innerHTML = "";
+    replies.forEach(r => {
       const div = document.createElement("div");
       div.className = "suggestion-item";
       div.textContent = r;
@@ -141,28 +141,29 @@ async function getWatsonSuggestions(message, senderType) {
 
   } catch (error) {
     console.error("Erreur récupération Watsonx:", error);
+    appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
     suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
   }
 }
 
 // Envoi message Agent
-function sendMessageToWatson(message) {
+function sendMessageFromAgent(message) {
   appendMessage("Agent", message);
-  getWatsonSuggestions(message, "agent");
+  getWatsonResponse(message, "agent");
   freeInput.value = "";
 }
 
 // Événement clic sur Envoyer
 sendBtn.addEventListener("click", () => {
   const message = freeInput.value.trim();
-  if (message) sendMessageToWatson(message);
+  if (message) sendMessageFromAgent(message);
 });
 
 // Événement Enter
 freeInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     const message = freeInput.value.trim();
-    if (message) sendMessageToWatson(message);
+    if (message) sendMessageFromAgent(message);
   }
 });
 
@@ -176,7 +177,7 @@ if (api) {
     const call = event.Call || {};
     const msg = call.IMMessage || "Message inconnu";
     appendMessage("Client", msg);
-    await getWatsonSuggestions(msg, "client");
+    await getWatsonResponse(msg, "client");
   };
 }
 </script>
