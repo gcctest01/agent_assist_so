@@ -5,31 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistant Agent Assist - Watsonx Orchestrate</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 12px;
+      background: #f9f9f9;
+    }
     h2 { color: #004080; }
     #messageContainer {
       display: flex;
       flex-direction: column;
-      max-height: 400px;
+      max-height: 500px;
       overflow-y: auto;
       margin-bottom: 20px;
-      border: 1px solid #ccc;
-      padding: 10px;
-      background: #fff;
-      border-radius: 6px;
+    }
+    .messageWrapper {
+      display: flex;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .messageIcon {
+      width: 30px;
+      font-size: 20px;
+      margin-right: 8px;
     }
     .message {
       border-radius: 6px;
       padding: 10px;
-      margin-bottom: 10px;
-      font-size: 15px;
+      font-size: 16px;
       word-wrap: break-word;
       max-width: 70%;
     }
-    .clientMessage { background: #e6f0ff; text-align: left; color: #004080; }
-    .agentMessage { background: #cce5ff; text-align: right; color: #004080; }
-    .assistantMessage { background: #d9f0ff; text-align: left; color: #004080; }
-
+    .clientMessage {
+      background: #cce5ff;
+      align-self: flex-end;
+      text-align: right;
+    }
+    .agentMessage {
+      background: #b3d7ff;
+      align-self: flex-end;
+      text-align: right;
+    }
+    .assistantMessage {
+      background: #e6f0ff;
+      align-self: flex-start;
+      text-align: left;
+    }
     .suggestion-item {
       padding: 10px;
       border-bottom: 1px solid #eee;
@@ -40,17 +60,6 @@
       align-items: center;
     }
     .suggestion-item:hover { background: #d0e1ff; }
-    .copyBtn {
-      background: #004080;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      font-size: 12px;
-      cursor: pointer;
-      border-radius: 5px;
-    }
-    .copyBtn:hover { background: #0050b3; }
-
     #inputContainer {
       margin-top: 20px;
       background: #fff;
@@ -58,10 +67,23 @@
       border-radius: 6px;
       border: 1px solid #ccc;
     }
-    #freeInput { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #aaa; font-size: 15px; }
-    #sendBtn { margin-top: 10px; padding: 10px 18px; background: #004080; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    #freeInput {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+      font-size: 15px;
+    }
+    #sendBtn {
+      margin-top: 10px;
+      padding: 10px 18px;
+      background: #004080;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
     #sendBtn:hover { background: #0050b3; }
-
     #suggestionsList {
       border: 1px solid #ccc;
       border-radius: 6px;
@@ -69,7 +91,6 @@
       max-height: 200px;
       overflow-y: auto;
       padding: 8px;
-      margin-bottom: 20px;
     }
   </style>
 </head>
@@ -77,7 +98,7 @@
 
 <h2>Conversation avec l'Agent :</h2>
 <div id="messageContainer">
-  <!-- Tous les messages seront ajoutés ici -->
+  <!-- Historique complet des messages -->
 </div>
 
 <h3>Suggestions de réponses :</h3>
@@ -104,12 +125,28 @@ if (!clientId) {
   localStorage.setItem("clientId", clientId);
 }
 
-// Fonction pour ajouter un message à l'historique
-function addMessage(sender, text, className) {
-  const div = document.createElement("div");
-  div.className = `message ${className}`;
-  div.textContent = `${sender} : ${text}`;
-  messageContainer.appendChild(div);
+function appendMessage(message, type) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "messageWrapper";
+
+  const icon = document.createElement("div");
+  icon.className = "messageIcon";
+  if(type === "client") icon.textContent = "🧑";       // Client
+  else if(type === "agent") icon.textContent = "👩‍💼"; // Agent
+  else if(type === "assistant") icon.textContent = "🤖"; // Assistant
+
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "message";
+  if(type === "client") msgDiv.classList.add("clientMessage");
+  else if(type === "agent") msgDiv.classList.add("agentMessage");
+  else msgDiv.classList.add("assistantMessage");
+
+  msgDiv.textContent = message;
+
+  wrapper.appendChild(icon);
+  wrapper.appendChild(msgDiv);
+  messageContainer.appendChild(wrapper);
+
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
@@ -134,15 +171,16 @@ async function getWatsonSuggestions(messageClient) {
       div.className = "suggestion-item";
       div.textContent = r;
 
-      const copyBtn = document.createElement("button");
-      copyBtn.className = "copyBtn";
-      copyBtn.textContent = "Passer";
-
-      copyBtn.addEventListener("click", () => {
-        addMessage("Assistant Watson", r, "assistantMessage");
+      // Copier le texte dans le presse-papier au clic
+      div.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(r);
+          alert("Texte copié dans le presse-papier !");
+        } catch (err) {
+          console.error("Impossible de copier le texte :", err);
+        }
       });
 
-      div.appendChild(copyBtn);
       suggestionsList.appendChild(div);
     });
 
@@ -154,40 +192,40 @@ async function getWatsonSuggestions(messageClient) {
   }
 }
 
-// Envoyer un message
-function sendMessage(message) {
-  addMessage("Client", message, "clientMessage");
-  freeInput.value = "";
+// Envoi du message
+function sendMessageToWatson(message) {
+  appendMessage(message, "client");
   getWatsonSuggestions(message);
+  freeInput.value = "";
 }
 
-// Bouton Envoyer
+// Clic sur bouton Envoyer
 sendBtn.addEventListener("click", () => {
   const message = freeInput.value.trim();
-  if (message) sendMessage(message);
+  if(message) sendMessageToWatson(message);
 });
 
 // Touche Enter
 freeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
+  if(e.key === "Enter") {
     const message = freeInput.value.trim();
-    if (message) sendMessage(message);
+    if(message) sendMessageToWatson(message);
   }
 });
 
 // Recevoir un message via SDK OneAgent
 let api;
-if (typeof getAgentAPI === "function") {
+if(typeof getAgentAPI === "function") {
   api = getAgentAPI();
-} else if (typeof oneAgentSDK === "function") {
+} else if(typeof oneAgentSDK === "function") {
   api = new oneAgentSDK();
 }
 
-if (api) {
+if(api) {
   api.onCallMessageReceived = async function(event) {
     const call = event.Call || {};
     const msg = call.IMMessage || "Message inconnu";
-    addMessage("Agent", msg, "agentMessage");
+    appendMessage(msg, "agent");
     await getWatsonSuggestions(msg);
   };
 }
