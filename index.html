@@ -6,15 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistant Agent Assist - Watsonx Orchestrate</title>
   <style>
-    /* Styles pour l'interface utilisateur */
     body {
       font-family: Arial, sans-serif;
       margin: 12px;
       background: #f9f9f9;
     }
 
-    h2,
-    h3 {
+    h2, h3 {
       color: #004080;
     }
 
@@ -81,11 +79,12 @@
       background: #0050b3;
     }
 
-    /* Styles pour l'indicateur de sentiment */
-    .sentiment-indicator {
-      margin-top: 10px;
+    #globalSentiment {
+      position: absolute;
+      top: 12px;
+      right: 20px;
+      font-size: 14px;
       font-weight: bold;
-      font-size: 12px;
     }
 
     .positive {
@@ -98,15 +97,6 @@
 
     .neutral {
       color: gray;
-    }
-
-    /* Indicateur global de sentiment */
-    #globalSentiment {
-      position: absolute;
-      top: 12px;
-      right: 20px;
-      font-size: 14px;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -151,35 +141,33 @@
       localStorage.setItem("clientId", clientId);
     }
 
-    // Fonction pour afficher un message dans la conversation
+    let conversationSentiment = 0; // Sentiment global cumulé
+
     function appendMessage(sender, message) {
       messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
-    // Fonction pour mettre à jour l'indicateur de sentiment global
-    let conversationSentiment = 0;  // 0 = neutre, >0 = positif, <0 = négatif
-
+    // Mettre à jour le sentiment global
     function updateGlobalSentiment() {
-      let sentimentText = "Sentiment global : Neutre ";  // Initialiser sans emoji
+      let sentimentText = "Sentiment global : Neutre ";  // Initialiser avec neutre
       let sentimentClass = "neutral";
       let emoji = "😐";  // Emoji par défaut
 
       if (conversationSentiment > 0.5) {
-        sentimentText = "Sentiment global : Positif ";  // Remplacer "Neutre" par "Positif"
+        sentimentText = "Sentiment global : Positif ";
         sentimentClass = "positive";
         emoji = "😊";
       } else if (conversationSentiment < -0.5) {
-        sentimentText = "Sentiment global : Négatif ";  // Remplacer "Neutre" par "Négatif"
+        sentimentText = "Sentiment global : Négatif ";
         sentimentClass = "negative";
         emoji = "😞";
       }
 
-      globalSentiment.textContent = `${sentimentText}${emoji}`;  // Ajout de l'emoji après le texte
-      globalSentiment.className = sentimentClass;  // Applique la classe de couleur appropriée
+      globalSentiment.textContent = `${sentimentText}${emoji}`;
+      globalSentiment.className = sentimentClass; // Applique la classe appropriée
     }
 
-    // Fonction pour récupérer la réponse de Watson et afficher le sentiment
     async function getWatsonResponse(message, senderType) {
       try {
         const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
@@ -192,18 +180,16 @@
 
         const data = await res.json();
         const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-        const sentimentScore = data.sentiment || null;  // Obtenez le score de sentiment
+        const sentimentScore = data.sentiment || 0;  // Assurez-vous que le score est bien 0 si non défini
 
-        // Afficher chaque réponse de Watson
+        // Ajouter le message à la conversation
         replies.forEach(r => appendMessage("Assistant Watson", r));
 
         // Mettre à jour le sentiment global de la conversation
-        if (sentimentScore !== null) {
-          conversationSentiment += sentimentScore;  // Ajout du score du message au sentiment global
-          updateGlobalSentiment();  // Met à jour l'affichage du sentiment global
-        }
+        conversationSentiment += sentimentScore;  // Ajout du sentiment du message au sentiment global
+        updateGlobalSentiment();  // Mise à jour du sentiment global
 
-        // Mettre les suggestions dans la liste cliquable
+        // Ajouter les suggestions
         suggestionsList.innerHTML = "";
         replies.forEach(r => {
           const div = document.createElement("div");
@@ -219,7 +205,6 @@
           });
           suggestionsList.appendChild(div);
         });
-
       } catch (error) {
         console.error("Erreur récupération Watsonx:", error);
         appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
@@ -234,33 +219,17 @@
       freeInput.value = "";
     }
 
-    // Événement clic sur Envoyer
     sendBtn.addEventListener("click", () => {
       const message = freeInput.value.trim();
       if (message) sendMessageFromAgent(message);
     });
 
-    // Événement Enter
     freeInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         const message = freeInput.value.trim();
         if (message) sendMessageFromAgent(message);
       }
     });
-
-    // Recevoir message Client via OneAgent
-    let api;
-    if (typeof getAgentAPI === "function") api = getAgentAPI();
-    else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
-
-    if (api) {
-      api.onCallMessageReceived = async function(event) {
-        const call = event.Call || {};
-        const msg = call.IMMessage || "Message inconnu";
-        appendMessage("Client", msg);
-        await getWatsonResponse(msg, "client");
-      };
-    }
   </script>
 
 </body>
