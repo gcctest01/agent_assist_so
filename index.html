@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistant Agent Assist - Watsonx Orchestrate</title>
   <style>
+    /* Styles pour l'interface utilisateur */
     body {
       font-family: Arial, sans-serif;
       margin: 12px;
@@ -72,115 +73,7 @@
 
 <h2>Conversation avec l'Assistant Watson :</h2>
 <div id="messageContainer">
-  <!-- Historique complet -->
+  <!-- Historique complet des messages -->
 </div>
 
-<h3>Suggestions de réponses :</h3>
-<div id="suggestionsList">
-  <div>Aucune suggestion pour le moment...</div>
-</div>
-
-<div id="inputContainer">
-  <label for="freeInput"><strong>Saisir un message :</strong></label>
-  <input id="freeInput" type="text" placeholder="Écrire le message ici…">
-  <button id="sendBtn">Envoyer</button>
-</div>
-
-<script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
-<script>
-const messageContainer = document.getElementById("messageContainer");
-const suggestionsList = document.getElementById("suggestionsList");
-const freeInput = document.getElementById("freeInput");
-const sendBtn = document.getElementById("sendBtn");
-
-let clientId = localStorage.getItem("clientId");
-if (!clientId) {
-  clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
-  localStorage.setItem("clientId", clientId);
-}
-
-// Fonction pour afficher un message dans la conversation
-function appendMessage(sender, message) {
-  messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
-  messageContainer.scrollTop = messageContainer.scrollHeight;
-}
-
-// Fonction pour récupérer la réponse de Watson
-async function getWatsonResponse(message, senderType) {
-  try {
-    const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: message, clientId })
-    });
-
-    if (!res.ok) throw new Error("Erreur API Orchestrate");
-
-    const data = await res.json();
-    const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-
-    // Afficher chaque réponse de Watson
-    replies.forEach(r => appendMessage("Assistant Watson", r));
-
-    // Mettre les suggestions dans la liste cliquable
-    suggestionsList.innerHTML = "";
-    replies.forEach(r => {
-      const div = document.createElement("div");
-      div.className = "suggestion-item";
-      div.textContent = r;
-      div.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(r);
-          alert("Texte copié dans le presse-papier !");
-        } catch (err) {
-          console.error("Impossible de copier le texte :", err);
-        }
-      });
-      suggestionsList.appendChild(div);
-    });
-
-  } catch (error) {
-    console.error("Erreur récupération Watsonx:", error);
-    appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
-    suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
-  }
-}
-
-// Envoi message Agent
-function sendMessageFromAgent(message) {
-  appendMessage("Agent", message);
-  getWatsonResponse(message, "agent");
-  freeInput.value = "";
-}
-
-// Événement clic sur Envoyer
-sendBtn.addEventListener("click", () => {
-  const message = freeInput.value.trim();
-  if (message) sendMessageFromAgent(message);
-});
-
-// Événement Enter
-freeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const message = freeInput.value.trim();
-    if (message) sendMessageFromAgent(message);
-  }
-});
-
-// Recevoir message Client via OneAgent
-let api;
-if (typeof getAgentAPI === "function") api = getAgentAPI();
-else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
-
-if (api) {
-  api.onCallMessageReceived = async function(event) {
-    const call = event.Call || {};
-    const msg = call.IMMessage || "Message inconnu";
-    appendMessage("Client", msg);
-    await getWatsonResponse(msg, "client");
-  };
-}
-</script>
-
-</body>
-</html>
+<h3>Suggestions
