@@ -68,28 +68,53 @@
     }
     #sendBtn:hover { background: #0050b3; }
 
-    /* Styles pour l'indicateur de sentiment */
-    .sentiment-indicator {
-      margin-top: 10px;
+    /* Styles pour l'indicateur de sentiment global */
+    .sentiment-state {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      font-size: 20px;
       font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: 30px;
+      background-color: #f1f1f1;
     }
 
-    .positive {
+    .sentiment-state span {
+      margin-left: 10px;
+    }
+
+    .emoji {
+      font-size: 25px;
+    }
+
+    /* Couleurs de l'état de sentiment */
+    .sentiment-neutral {
+      color: black;
+    }
+
+    .sentiment-positive {
       color: green;
     }
 
-    .negative {
+    .sentiment-negative {
       color: red;
-    }
-
-    .neutral {
-      color: gray;
     }
   </style>
 </head>
 <body>
 
 <h2>Conversation avec l'Assistant Watson :</h2>
+
+<!-- Etat global du sentiment -->
+<div id="sentimentState" class="sentiment-state sentiment-neutral">
+  <span class="emoji" id="sentimentEmoji">😐</span>
+  <span id="sentimentText">Neutre</span>
+</div>
+
 <div id="messageContainer">
   <!-- Historique complet des messages -->
 </div>
@@ -120,33 +145,46 @@ if (!clientId) {
   localStorage.setItem("clientId", clientId);
 }
 
+// Variables pour gérer l'état de sentiment global
+let sentimentScore = 0;  // Score global de sentiment initial (neutre)
+let messages = [];  // Historique des messages échangés
+
 // Fonction pour afficher un message dans la conversation
 function appendMessage(sender, message) {
   messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
-// Fonction pour afficher l'indicateur de sentiment
-function appendSentimentIndicator(score) {
-  const sentimentDiv = document.createElement("div");
-  sentimentDiv.className = "sentiment-indicator";
+// Fonction pour mettre à jour l'état global du sentiment
+function updateSentimentState() {
+  let sentimentText = "Neutre";
+  let emoji = "😐";
+  let sentimentClass = "sentiment-neutral";
 
-  let sentimentText = "Sentiment du message : ";
-  let sentimentClass = "neutral";
-
-  if (score > 0.5) {
-    sentimentText += "Positif 😊";
-    sentimentClass = "positive";
-  } else if (score < -0.5) {
-    sentimentText += "Négatif 😞";
-    sentimentClass = "negative";
-  } else {
-    sentimentText += "Neutre 😐";
+  if (sentimentScore > 0.5) {
+    sentimentText = "Positif";
+    emoji = "😊";
+    sentimentClass = "sentiment-positive";
+  } else if (sentimentScore < -0.5) {
+    sentimentText = "Négatif";
+    emoji = "☹️";
+    sentimentClass = "sentiment-negative";
   }
 
-  sentimentDiv.classList.add(sentimentClass);
-  sentimentDiv.textContent = sentimentText;
-  messageContainer.appendChild(sentimentDiv);
+  document.getElementById('sentimentState').className = `sentiment-state ${sentimentClass}`;
+  document.getElementById('sentimentText').textContent = sentimentText;
+  document.getElementById('sentimentEmoji').textContent = emoji;
+}
+
+// Fonction pour calculer le sentiment global de la conversation
+async function analyzeSentimentOfConversation() {
+  // Ici, vous pouvez intégrer une analyse de sentiment plus avancée
+  // Pour l'instant, nous calculons le sentiment moyen de tous les messages
+
+  const totalSentiment = messages.reduce((acc, msg) => acc + (msg.sentiment || 0), 0);
+  sentimentScore = totalSentiment / messages.length;
+
+  updateSentimentState();  // Mettre à jour l'affichage de l'état global de sentiment
 }
 
 // Fonction pour récupérer la réponse de Watson et afficher le sentiment
@@ -162,15 +200,16 @@ async function getWatsonResponse(message, senderType) {
 
     const data = await res.json();
     const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-    const sentimentScore = data.sentiment || null;  // Obtenez le score de sentiment
+    const sentimentScore = data.sentiment || 0;  // Obtenez le score de sentiment du message
+
+    // Ajouter le message et son sentiment à l'historique
+    messages.push({ role: senderType, content: message, sentiment: sentimentScore });
 
     // Afficher chaque réponse de Watson
     replies.forEach(r => appendMessage("Assistant Watson", r));
 
-    // Afficher l'indicateur de sentiment
-    if (sentimentScore !== null) {
-      appendSentimentIndicator(sentimentScore);
-    }
+    // Mettre à jour l'état global du sentiment
+    await analyzeSentimentOfConversation();
 
     // Mettre les suggestions dans la liste cliquable
     suggestionsList.innerHTML = "";
@@ -205,32 +244,4 @@ function sendMessageFromAgent(message) {
 
 // Événement clic sur Envoyer
 sendBtn.addEventListener("click", () => {
-  const message = freeInput.value.trim();
-  if (message) sendMessageFromAgent(message);
-});
-
-// Événement Enter
-freeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const message = freeInput.value.trim();
-    if (message) sendMessageFromAgent(message);
-  }
-});
-
-// Recevoir message Client via OneAgent
-let api;
-if (typeof getAgentAPI === "function") api = getAgentAPI();
-else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
-
-if (api) {
-  api.onCallMessageReceived = async function(event) {
-    const call = event.Call || {};
-    const msg = call.IMMessage || "Message inconnu";
-    appendMessage("Client", msg);
-    await getWatsonResponse(msg, "client");
-  };
-}
-</script>
-
-</body>
-</html>
+  const message = free
