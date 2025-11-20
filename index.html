@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +12,11 @@
       margin: 12px;
       background: #f9f9f9;
     }
-    h2, h3 { color: #004080; }
+
+    h2,
+    h3 {
+      color: #004080;
+    }
 
     #messageContainer {
       background: #fff;
@@ -41,7 +46,10 @@
       cursor: pointer;
       color: #004080;
     }
-    .suggestion-item:hover { background: #d0e1ff; }
+
+    .suggestion-item:hover {
+      background: #d0e1ff;
+    }
 
     #inputContainer {
       margin-top: 20px;
@@ -50,6 +58,7 @@
       border-radius: 6px;
       border: 1px solid #ccc;
     }
+
     #freeInput {
       width: 100%;
       padding: 10px;
@@ -57,6 +66,7 @@
       border: 1px solid #aaa;
       font-size: 15px;
     }
+
     #sendBtn {
       margin-top: 10px;
       padding: 10px 18px;
@@ -66,13 +76,16 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    #sendBtn:hover { background: #0050b3; }
+
+    #sendBtn:hover {
+      background: #0050b3;
+    }
 
     /* Styles pour l'indicateur de sentiment */
     .sentiment-indicator {
       margin-top: 10px;
       font-weight: bold;
-      font-size: 12px;  /* Police plus petite */
+      font-size: 12px;
     }
 
     .positive {
@@ -97,157 +110,159 @@
     }
   </style>
 </head>
+
 <body>
 
-<h2>Conversation avec l'Assistant Watson :</h2>
+  <h2>Conversation avec l'Assistant Watson :</h2>
 
-<!-- Sentiment global, placé en haut à droite -->
-<div id="globalSentiment">
-  Sentiment global : Attente de début de la conversation 😐
-</div>
+  <!-- Sentiment global, placé en haut à droite -->
+  <div id="globalSentiment">
+    Sentiment global : Attente de début de la conversation 😐
+  </div>
 
-<div id="messageContainer">
-  <!-- Historique complet des messages -->
-</div>
+  <div id="messageContainer">
+    <!-- Historique complet des messages -->
+  </div>
 
-<h3>Suggestions de réponses :</h3>
-<div id="suggestionsList">
-  <div>Aucune suggestion pour le moment...</div>
-</div>
+  <h3>Suggestions de réponses :</h3>
+  <div id="suggestionsList">
+    <div>Aucune suggestion pour le moment...</div>
+  </div>
 
-<div id="inputContainer">
-  <label for="freeInput"><strong>Saisir un message :</strong></label>
-  <input id="freeInput" type="text" placeholder="Écrire le message ici…">
-  <button id="sendBtn">Envoyer</button>
-</div>
+  <div id="inputContainer">
+    <label for="freeInput"><strong>Saisir un message :</strong></label>
+    <input id="freeInput" type="text" placeholder="Écrire le message ici…">
+    <button id="sendBtn">Envoyer</button>
+  </div>
 
-<script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
-<script>
-// Sélection des éléments DOM
-const messageContainer = document.getElementById("messageContainer");
-const suggestionsList = document.getElementById("suggestionsList");
-const freeInput = document.getElementById("freeInput");
-const sendBtn = document.getElementById("sendBtn");
-const globalSentiment = document.getElementById("globalSentiment");
+  <script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
+  <script>
+    // Sélection des éléments DOM
+    const messageContainer = document.getElementById("messageContainer");
+    const suggestionsList = document.getElementById("suggestionsList");
+    const freeInput = document.getElementById("freeInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const globalSentiment = document.getElementById("globalSentiment");
 
-// Génération d'un ID client unique
-let clientId = localStorage.getItem("clientId");
-if (!clientId) {
-  clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
-  localStorage.setItem("clientId", clientId);
-}
-
-// Fonction pour afficher un message dans la conversation
-function appendMessage(sender, message) {
-  messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
-  messageContainer.scrollTop = messageContainer.scrollHeight;
-}
-
-// Fonction pour mettre à jour l'indicateur de sentiment global
-let conversationSentiment = 0;  // 0 = neutre, >0 = positif, <0 = négatif
-
-function updateGlobalSentiment() {
-  let sentimentText = "Sentiment global : Neutre ";  // Initialiser sans emoji
-  let sentimentClass = "neutral";
-  let emoji = "😐";  // Emoji par défaut
-
-  if (conversationSentiment > 0.5) {
-    sentimentText = "Sentiment global : Positif ";  // Remplacer "Neutre" par "Positif"
-    sentimentClass = "positive";
-    emoji = "😊";
-  } else if (conversationSentiment < -0.5) {
-    sentimentText = "Sentiment global : Négatif ";  // Remplacer "Neutre" par "Négatif"
-    sentimentClass = "negative";
-    emoji = "😞";
-  }
-
-  globalSentiment.textContent = `${sentimentText}${emoji}`;  // Ajout de l'emoji après le texte
-  globalSentiment.className = sentimentClass;  // Applique la classe de couleur appropriée
-}
-
-// Fonction pour récupérer la réponse de Watson et afficher le sentiment
-async function getWatsonResponse(message, senderType) {
-  try {
-    const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: message, clientId })
-    });
-
-    if (!res.ok) throw new Error("Erreur API Orchestrate");
-
-    const data = await res.json();
-    const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-    const sentimentScore = data.sentiment || null;  // Obtenez le score de sentiment
-
-    // Afficher chaque réponse de Watson
-    replies.forEach(r => appendMessage("Assistant Watson", r));
-
-    // Mettre à jour le sentiment global de la conversation
-    if (sentimentScore !== null) {
-      conversationSentiment += sentimentScore;
-      updateGlobalSentiment();
+    // Génération d'un ID client unique
+    let clientId = localStorage.getItem("clientId");
+    if (!clientId) {
+      clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+      localStorage.setItem("clientId", clientId);
     }
 
-    // Mettre les suggestions dans la liste cliquable
-    suggestionsList.innerHTML = "";
-    replies.forEach(r => {
-      const div = document.createElement("div");
-      div.className = "suggestion-item";
-      div.textContent = r;
-      div.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(r);
-          alert("Texte copié dans le presse-papier !");
-        } catch (err) {
-          console.error("Impossible de copier le texte :", err);
+    // Fonction pour afficher un message dans la conversation
+    function appendMessage(sender, message) {
+      messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    // Fonction pour mettre à jour l'indicateur de sentiment global
+    let conversationSentiment = 0;  // 0 = neutre, >0 = positif, <0 = négatif
+
+    function updateGlobalSentiment() {
+      let sentimentText = "Sentiment global : Neutre ";  // Initialiser sans emoji
+      let sentimentClass = "neutral";
+      let emoji = "😐";  // Emoji par défaut
+
+      if (conversationSentiment > 0.5) {
+        sentimentText = "Sentiment global : Positif ";  // Remplacer "Neutre" par "Positif"
+        sentimentClass = "positive";
+        emoji = "😊";
+      } else if (conversationSentiment < -0.5) {
+        sentimentText = "Sentiment global : Négatif ";  // Remplacer "Neutre" par "Négatif"
+        sentimentClass = "negative";
+        emoji = "😞";
+      }
+
+      globalSentiment.textContent = `${sentimentText}${emoji}`;  // Ajout de l'emoji après le texte
+      globalSentiment.className = sentimentClass;  // Applique la classe de couleur appropriée
+    }
+
+    // Fonction pour récupérer la réponse de Watson et afficher le sentiment
+    async function getWatsonResponse(message, senderType) {
+      try {
+        const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: message, clientId })
+        });
+
+        if (!res.ok) throw new Error("Erreur API Orchestrate");
+
+        const data = await res.json();
+        const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
+        const sentimentScore = data.sentiment || null;  // Obtenez le score de sentiment
+
+        // Afficher chaque réponse de Watson
+        replies.forEach(r => appendMessage("Assistant Watson", r));
+
+        // Mettre à jour le sentiment global de la conversation
+        if (sentimentScore !== null) {
+          conversationSentiment += sentimentScore;  // Ajout du score du message au sentiment global
+          updateGlobalSentiment();  // Met à jour l'affichage du sentiment global
         }
-      });
-      suggestionsList.appendChild(div);
+
+        // Mettre les suggestions dans la liste cliquable
+        suggestionsList.innerHTML = "";
+        replies.forEach(r => {
+          const div = document.createElement("div");
+          div.className = "suggestion-item";
+          div.textContent = r;
+          div.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(r);
+              alert("Texte copié dans le presse-papier !");
+            } catch (err) {
+              console.error("Impossible de copier le texte :", err);
+            }
+          });
+          suggestionsList.appendChild(div);
+        });
+
+      } catch (error) {
+        console.error("Erreur récupération Watsonx:", error);
+        appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
+        suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
+      }
+    }
+
+    // Envoi message Agent
+    function sendMessageFromAgent(message) {
+      appendMessage("Agent", message);
+      getWatsonResponse(message, "agent");
+      freeInput.value = "";
+    }
+
+    // Événement clic sur Envoyer
+    sendBtn.addEventListener("click", () => {
+      const message = freeInput.value.trim();
+      if (message) sendMessageFromAgent(message);
     });
 
-  } catch (error) {
-    console.error("Erreur récupération Watsonx:", error);
-    appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
-    suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
-  }
-}
+    // Événement Enter
+    freeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const message = freeInput.value.trim();
+        if (message) sendMessageFromAgent(message);
+      }
+    });
 
-// Envoi message Agent
-function sendMessageFromAgent(message) {
-  appendMessage("Agent", message);
-  getWatsonResponse(message, "agent");
-  freeInput.value = "";
-}
+    // Recevoir message Client via OneAgent
+    let api;
+    if (typeof getAgentAPI === "function") api = getAgentAPI();
+    else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
 
-// Événement clic sur Envoyer
-sendBtn.addEventListener("click", () => {
-  const message = freeInput.value.trim();
-  if (message) sendMessageFromAgent(message);
-});
-
-// Événement Enter
-freeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const message = freeInput.value.trim();
-    if (message) sendMessageFromAgent(message);
-  }
-});
-
-// Recevoir message Client via OneAgent
-let api;
-if (typeof getAgentAPI === "function") api = getAgentAPI();
-else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
-
-if (api) {
-  api.onCallMessageReceived = async function(event) {
-    const call = event.Call || {};
-    const msg = call.IMMessage || "Message inconnu";
-    appendMessage("Client", msg);
-    await getWatsonResponse(msg, "client");
-  };
-}
-</script>
+    if (api) {
+      api.onCallMessageReceived = async function(event) {
+        const call = event.Call || {};
+        const msg = call.IMMessage || "Message inconnu";
+        appendMessage("Client", msg);
+        await getWatsonResponse(msg, "client");
+      };
+    }
+  </script>
 
 </body>
+
 </html>
