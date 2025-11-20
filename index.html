@@ -112,7 +112,7 @@
 <!-- Etat global du sentiment -->
 <div id="sentimentState" class="sentiment-state sentiment-neutral">
   <span class="emoji" id="sentimentEmoji">😐</span>
-  <span id="sentimentText">Neutre</span>
+  <span id="sentimentText">Sentiment de la conversation : Attente de début de la conversation</span>
 </div>
 
 <div id="messageContainer">
@@ -157,16 +157,16 @@ function appendMessage(sender, message) {
 
 // Fonction pour mettre à jour l'état global du sentiment
 function updateSentimentState() {
-  let sentimentText = "Neutre";
+  let sentimentText = "Attente de début de la conversation";
   let emoji = "😐";
   let sentimentClass = "sentiment-neutral";
 
   if (sentimentScore > 0.5) {
-    sentimentText = "Positif";
+    sentimentText = "Sentiment de la conversation : Positif";
     emoji = "😊";
     sentimentClass = "sentiment-positive";
   } else if (sentimentScore < -0.5) {
-    sentimentText = "Négatif";
+    sentimentText = "Sentiment de la conversation : Négatif";
     emoji = "☹️";
     sentimentClass = "sentiment-negative";
   }
@@ -244,4 +244,32 @@ function sendMessageFromAgent(message) {
 
 // Événement clic sur Envoyer
 sendBtn.addEventListener("click", () => {
-  const message = free
+  const message = freeInput.value.trim();
+  if (message) sendMessageFromAgent(message);
+});
+
+// Événement Enter
+freeInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const message = freeInput.value.trim();
+    if (message) sendMessageFromAgent(message);
+  }
+});
+
+// Recevoir message Client via OneAgent
+let api;
+if (typeof getAgentAPI === "function") api = getAgentAPI();
+else if (typeof oneAgentSDK === "function") api = new oneAgentSDK();
+
+if (api) {
+  api.onCallMessageReceived = async function(event) {
+    const call = event.Call || {};
+    const msg = call.IMMessage || "Message inconnu";
+    appendMessage("Client", msg);
+    await getWatsonResponse(msg, "client");
+  };
+}
+</script>
+
+</body>
+</html>
