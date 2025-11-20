@@ -68,40 +68,32 @@
     }
     #sendBtn:hover { background: #0050b3; }
 
-    /* Styles pour l'indicateur de sentiment global */
-    .sentiment-state {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      font-size: 20px;
+    /* Styles pour l'indicateur de sentiment */
+    .sentiment-indicator {
+      margin-top: 10px;
       font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 20px;
-      border-radius: 30px;
-      background-color: #f1f1f1;
+      font-size: 12px;  /* Police plus petite */
     }
 
-    .sentiment-state span {
-      margin-left: 10px;
-    }
-
-    .emoji {
-      font-size: 25px;
-    }
-
-    /* Couleurs de l'état de sentiment */
-    .sentiment-neutral {
-      color: black;
-    }
-
-    .sentiment-positive {
+    .positive {
       color: green;
     }
 
-    .sentiment-negative {
+    .negative {
       color: red;
+    }
+
+    .neutral {
+      color: gray;
+    }
+
+    /* Indicateur global de sentiment */
+    #globalSentiment {
+      position: absolute;
+      top: 12px;
+      right: 20px;
+      font-size: 14px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -109,10 +101,9 @@
 
 <h2>Conversation avec l'Assistant Watson :</h2>
 
-<!-- Etat global du sentiment -->
-<div id="sentimentState" class="sentiment-state sentiment-neutral">
-  <span class="emoji" id="sentimentEmoji">😐</span>
-  <span id="sentimentText">Sentiment de la conversation : Attente de début de la conversation</span>
+<!-- Sentiment global, placé en haut à droite -->
+<div id="globalSentiment">
+  Sentiment global : Attente de début de la conversation 😐
 </div>
 
 <div id="messageContainer">
@@ -137,6 +128,7 @@ const messageContainer = document.getElementById("messageContainer");
 const suggestionsList = document.getElementById("suggestionsList");
 const freeInput = document.getElementById("freeInput");
 const sendBtn = document.getElementById("sendBtn");
+const globalSentiment = document.getElementById("globalSentiment");
 
 // Génération d'un ID client unique
 let clientId = localStorage.getItem("clientId");
@@ -145,46 +137,32 @@ if (!clientId) {
   localStorage.setItem("clientId", clientId);
 }
 
-// Variables pour gérer l'état de sentiment global
-let sentimentScore = 0;  // Score global de sentiment initial (neutre)
-let messages = [];  // Historique des messages échangés
-
 // Fonction pour afficher un message dans la conversation
 function appendMessage(sender, message) {
   messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
-// Fonction pour mettre à jour l'état global du sentiment
-function updateSentimentState() {
-  let sentimentText = "Attente de début de la conversation";
-  let emoji = "😐";
-  let sentimentClass = "sentiment-neutral";
+// Fonction pour mettre à jour l'indicateur de sentiment global
+let conversationSentiment = 0;  // 0 = neutre, >0 = positif, <0 = négatif
 
-  if (sentimentScore > 0.5) {
-    sentimentText = "Sentiment de la conversation : Positif";
+function updateGlobalSentiment() {
+  let sentimentText = "Sentiment global : Neutre 😐";
+  let sentimentClass = "neutral";
+  let emoji = "😐";
+
+  if (conversationSentiment > 0.5) {
+    sentimentText = "Sentiment global : Positif 😊";
+    sentimentClass = "positive";
     emoji = "😊";
-    sentimentClass = "sentiment-positive";
-  } else if (sentimentScore < -0.5) {
-    sentimentText = "Sentiment de la conversation : Négatif";
-    emoji = "☹️";
-    sentimentClass = "sentiment-negative";
+  } else if (conversationSentiment < -0.5) {
+    sentimentText = "Sentiment global : Négatif 😞";
+    sentimentClass = "negative";
+    emoji = "😞";
   }
 
-  document.getElementById('sentimentState').className = `sentiment-state ${sentimentClass}`;
-  document.getElementById('sentimentText').textContent = sentimentText;
-  document.getElementById('sentimentEmoji').textContent = emoji;
-}
-
-// Fonction pour calculer le sentiment global de la conversation
-async function analyzeSentimentOfConversation() {
-  // Ici, vous pouvez intégrer une analyse de sentiment plus avancée
-  // Pour l'instant, nous calculons le sentiment moyen de tous les messages
-
-  const totalSentiment = messages.reduce((acc, msg) => acc + (msg.sentiment || 0), 0);
-  sentimentScore = totalSentiment / messages.length;
-
-  updateSentimentState();  // Mettre à jour l'affichage de l'état global de sentiment
+  globalSentiment.textContent = `${sentimentText.replace("Neutre", "Attente de début de la conversation")} ${emoji}`;
+  globalSentiment.classList.add(sentimentClass);
 }
 
 // Fonction pour récupérer la réponse de Watson et afficher le sentiment
@@ -200,16 +178,16 @@ async function getWatsonResponse(message, senderType) {
 
     const data = await res.json();
     const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-    const sentimentScore = data.sentiment || 0;  // Obtenez le score de sentiment du message
-
-    // Ajouter le message et son sentiment à l'historique
-    messages.push({ role: senderType, content: message, sentiment: sentimentScore });
+    const sentimentScore = data.sentiment || null;  // Obtenez le score de sentiment
 
     // Afficher chaque réponse de Watson
     replies.forEach(r => appendMessage("Assistant Watson", r));
 
-    // Mettre à jour l'état global du sentiment
-    await analyzeSentimentOfConversation();
+    // Mettre à jour le sentiment global de la conversation
+    if (sentimentScore !== null) {
+      conversationSentiment += sentimentScore;
+      updateGlobalSentiment();
+    }
 
     // Mettre les suggestions dans la liste cliquable
     suggestionsList.innerHTML = "";
