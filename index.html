@@ -147,22 +147,22 @@ function appendMessage(sender, message) {
 let conversationSentiment = 0;  // 0 = neutre, >0 = positif, <0 = négatif
 
 function updateGlobalSentiment() {
-  let sentimentText = "Sentiment global : Neutre 😐";
+  let sentimentText = "Sentiment global : Neutre ";  // Initialiser sans emoji
   let sentimentClass = "neutral";
-  let emoji = "😐";
+  let emoji = "😐";  // Emoji par défaut
 
   if (conversationSentiment > 0.5) {
-    sentimentText = "Sentiment global : Positif 😊";
+    sentimentText = "Sentiment global : Positif ";  // Remplacer "Neutre" par "Positif"
     sentimentClass = "positive";
     emoji = "😊";
   } else if (conversationSentiment < -0.5) {
-    sentimentText = "Sentiment global : Négatif 😞";
+    sentimentText = "Sentiment global : Négatif ";  // Remplacer "Neutre" par "Négatif"
     sentimentClass = "negative";
     emoji = "😞";
   }
 
-  globalSentiment.textContent = `${sentimentText.replace("Neutre", "Attente de début de la conversation")} ${emoji}`;
-  globalSentiment.classList.add(sentimentClass);
+  globalSentiment.textContent = `${sentimentText}${emoji}`;  // Ajout de l'emoji après le texte
+  globalSentiment.className = sentimentClass;  // Applique la classe de couleur appropriée
 }
 
 // Fonction pour récupérer la réponse de Watson et afficher le sentiment
