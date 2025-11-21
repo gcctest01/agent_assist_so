@@ -75,15 +75,9 @@
       font-size: 14px;
       font-weight: bold;
     }
-    .positive {
-      color: green;
-    }
-    .negative {
-      color: red;
-    }
-    .neutral {
-      color: gray;
-    }
+    .positive { color: green; }
+    .negative { color: red; }
+    .neutral { color: gray; }
   </style>
 </head>
 <body>
@@ -127,7 +121,6 @@
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
-    // Mettre à jour le sentiment global
     function updateGlobalSentiment(sentimentScore, isUserMessage) {
       const weight = isUserMessage ? 2 : 1;
       conversationSentiment = ((conversationSentiment * userMessageCount) + (sentimentScore * weight)) / (userMessageCount + weight);
@@ -162,31 +155,45 @@
         if (!res.ok) throw new Error("Erreur API Orchestrate");
 
         const data = await res.json();
-        const sentimentScore = data.sentiment || 0; 
 
+        // Assurer un score neutre si NLU a échoué
+        const sentimentScore = data.sentiment ?? 0;
         updateGlobalSentiment(sentimentScore, senderType === "user");
 
         appendMessage("Assistant Watson", data.reply);
 
+        // Gérer les suggestions
         suggestionsList.innerHTML = "";
-        data.reply.forEach(r => {
-          const div = document.createElement("div");
-          div.className = "suggestion-item";
-          div.textContent = r;
-          div.addEventListener("click", async () => {
-            try {
-              await navigator.clipboard.writeText(r);
-              alert("Texte copié dans le presse-papier !");
-            } catch (err) {
-              console.error("Impossible de copier le texte :", err);
-            }
+        let suggestions = [];
+        if (Array.isArray(data.reply)) {
+          suggestions = data.reply;
+        } else if (typeof data.reply === "string" && data.reply.trim().length > 0) {
+          suggestions = [data.reply];
+        }
+
+        if (suggestions.length === 0) {
+          suggestionsList.innerHTML = "<div>Aucune suggestion disponible.</div>";
+        } else {
+          suggestions.forEach(r => {
+            const div = document.createElement("div");
+            div.className = "suggestion-item";
+            div.textContent = r;
+            div.addEventListener("click", async () => {
+              try {
+                await navigator.clipboard.writeText(r);
+                alert("Texte copié dans le presse-papier !");
+              } catch (err) {
+                console.error("Impossible de copier le texte :", err);
+              }
+            });
+            suggestionsList.appendChild(div);
           });
-          suggestionsList.appendChild(div);
-        });
+        }
+
       } catch (error) {
         console.error("Erreur récupération Watsonx:", error);
         appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
-        suggestionsList.innerHTML = "<div>Erreur lors de la récupération des suggestions.</div>";
+        suggestionsList.innerHTML = "<div>Pas de suggestions disponibles.</div>";
       }
     }
 
