@@ -89,12 +89,11 @@
 <body>
   <h2>Conversation avec l'Assistant Watson :</h2>
 
-  <!-- Sentiment global, placé en haut à droite -->
-  <div id="globalSentiment">Sentiment global : Attente de début de la conversation 😐</div>
-
-  <div id="messageContainer">
-    <!-- Historique complet des messages -->
+  <div id="globalSentiment">
+    Sentiment global : Attente de début de la conversation 😐
   </div>
+
+  <div id="messageContainer"></div>
 
   <h3>Suggestions de réponses :</h3>
   <div id="suggestionsList">
@@ -107,35 +106,36 @@
     <button id="sendBtn">Envoyer</button>
   </div>
 
-  <script src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
   <script>
-    // Sélection des éléments DOM
     const messageContainer = document.getElementById("messageContainer");
     const suggestionsList = document.getElementById("suggestionsList");
     const freeInput = document.getElementById("freeInput");
     const sendBtn = document.getElementById("sendBtn");
     const globalSentiment = document.getElementById("globalSentiment");
 
-    // Génération d'un ID client unique
     let clientId = localStorage.getItem("clientId");
     if (!clientId) {
       clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       localStorage.setItem("clientId", clientId);
     }
 
-    let conversationSentiment = 0;
+    let conversationSentiment = 0; // Sentiment global cumulé
+    let userMessageCount = 0; // Compteur de messages utilisateur
 
-    // Fonction pour ajouter un message à l'historique
     function appendMessage(sender, message) {
       messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
     // Mettre à jour le sentiment global
-    function updateGlobalSentiment() {
+    function updateGlobalSentiment(sentimentScore, isUserMessage) {
+      const weight = isUserMessage ? 2 : 1;
+      conversationSentiment = ((conversationSentiment * userMessageCount) + (sentimentScore * weight)) / (userMessageCount + weight);
+      if (isUserMessage) userMessageCount++;
+
       let sentimentText = "Sentiment global : Neutre ";
       let sentimentClass = "neutral";
-      let emoji = "😐"; // Emoji par défaut
+      let emoji = "😐";
 
       if (conversationSentiment > 0.5) {
         sentimentText = "Sentiment global : Positif ";
@@ -148,13 +148,12 @@
       }
 
       globalSentiment.textContent = `${sentimentText}${emoji}`;
-      globalSentiment.className = sentimentClass; // Applique la classe appropriée
+      globalSentiment.className = sentimentClass;
     }
 
-    // Fonction pour obtenir la réponse de Watson
     async function getWatsonResponse(message, senderType) {
       try {
-        const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
+        const res = await fetch("http://localhost:3000/api/sendToOrchestrate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: message, clientId })
@@ -163,25 +162,17 @@
         if (!res.ok) throw new Error("Erreur API Orchestrate");
 
         const data = await res.json();
-        const replies = Array.isArray(data.reply) ? data.reply : [data.reply];
-        const sentimentScore = data.sentiment || 0; // Assurez-vous que le score est bien 0 si non défini
+        const sentimentScore = data.sentiment || 0; 
 
-        // Ajouter le message à la conversation
-        replies.forEach(r => appendMessage("Assistant Watson", r));
+        updateGlobalSentiment(sentimentScore, senderType === "user");
 
-        // Mettre à jour le sentiment global de la conversation
-        conversationSentiment += sentimentScore;
+        appendMessage("Assistant Watson", data.reply);
 
-        // Mise à jour du sentiment global
-        updateGlobalSentiment();
-
-        // Ajouter les suggestions
         suggestionsList.innerHTML = "";
-        replies.forEach(r => {
+        data.reply.forEach(r => {
           const div = document.createElement("div");
           div.className = "suggestion-item";
           div.textContent = r;
-
           div.addEventListener("click", async () => {
             try {
               await navigator.clipboard.writeText(r);
@@ -190,10 +181,8 @@
               console.error("Impossible de copier le texte :", err);
             }
           });
-
           suggestionsList.appendChild(div);
         });
-
       } catch (error) {
         console.error("Erreur récupération Watsonx:", error);
         appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
@@ -201,14 +190,12 @@
       }
     }
 
-    // Envoi d'un message par l'agent
     function sendMessageFromAgent(message) {
       appendMessage("Agent", message);
       getWatsonResponse(message, "agent");
       freeInput.value = "";
     }
 
-    // Événements de clic et de clavier pour envoyer un message
     sendBtn.addEventListener("click", () => {
       const message = freeInput.value.trim();
       if (message) sendMessageFromAgent(message);
