@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assistant Agent Assist - Watsonx Orchestrate</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -68,12 +69,57 @@
     #sendBtn:hover {
       background: #0050b3;
     }
+
+    /** ⬇⬇⬇ TOGGLE IOS STYLE */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 25px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #ccc;
+      transition: 0.4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 19px;
+      width: 19px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
     #globalSentiment {
       position: absolute;
       top: 12px;
       right: 20px;
       font-size: 14px;
       font-weight: bold;
+      display: none;
     }
     .positive { color: green; }
     .negative { color: red; }
@@ -85,12 +131,13 @@
 
   <h2>Conversation avec l'Assistant Watson :</h2>
 
-  <!-- 🔍 SWITCH ANALYSE SENTIMENT -->
-  <div style="margin-bottom: 15px;">
-    <label>
+  <!-- 🔍 TOGGLE ANALYSE SENTIMENT -->
+  <div class="toggle-container">
+    <label class="toggle-switch">
       <input type="checkbox" id="sentimentToggle">
-      🔍 Activer l’analyse de sentiment
+      <span class="slider"></span>
     </label>
+    <span>🔍 Activer l’analyse de sentiment</span>
   </div>
 
   <div id="globalSentiment">
@@ -117,10 +164,14 @@
     const sendBtn = document.getElementById("sendBtn");
     const globalSentiment = document.getElementById("globalSentiment");
 
-    // 🔧 Activation/désactivation du sentiment
+    // 🔧 Toggle sentiment
     let sentimentAnalysisEnabled = false;
+
     document.getElementById("sentimentToggle").addEventListener("change", e => {
       sentimentAnalysisEnabled = e.target.checked;
+
+      // Masquer/afficher bloc sentiment
+      globalSentiment.style.display = sentimentAnalysisEnabled ? "block" : "none";
     });
 
     let clientId = localStorage.getItem("clientId");
@@ -168,7 +219,7 @@
           body: JSON.stringify({
             message,
             clientId,
-            sentimentEnabled: sentimentAnalysisEnabled   // <<< 🔥 ENVOI DU SWITCH AU BACKEND
+            sentimentEnabled: sentimentAnalysisEnabled
           })
         });
 
@@ -176,22 +227,18 @@
 
         const data = await res.json();
 
-        // 🔥 Analyse seulement si activée
+        // Calcul du sentiment uniquement si activé
         if (sentimentAnalysisEnabled && data.sentiment !== undefined) {
           updateGlobalSentiment(data.sentiment, senderType === "user");
         }
 
         appendMessage("Assistant Watson", data.reply);
 
-        // Gestion des suggestions
         suggestionsList.innerHTML = "";
         let suggestions = [];
 
-        if (Array.isArray(data.reply)) {
-          suggestions = data.reply;
-        } else if (typeof data.reply === "string" && data.reply.trim().length > 0) {
-          suggestions = [data.reply];
-        }
+        if (Array.isArray(data.reply)) suggestions = data.reply;
+        else if (typeof data.reply === "string" && data.reply.trim()) suggestions = [data.reply];
 
         if (suggestions.length === 0) {
           suggestionsList.innerHTML = "<div>Aucune suggestion disponible.</div>";
@@ -203,9 +250,9 @@
             div.addEventListener("click", async () => {
               try {
                 await navigator.clipboard.writeText(r);
-                alert("Texte copié dans le presse-papier !");
+                alert("Texte copié !");
               } catch (err) {
-                console.error("Impossible de copier le texte :", err);
+                console.error("Erreur copie :", err);
               }
             });
             suggestionsList.appendChild(div);
@@ -226,14 +273,14 @@
     }
 
     sendBtn.addEventListener("click", () => {
-      const message = freeInput.value.trim();
-      if (message) sendMessageFromAgent(message);
+      const msg = freeInput.value.trim();
+      if (msg) sendMessageFromAgent(msg);
     });
 
-    freeInput.addEventListener("keydown", (e) => {
+    freeInput.addEventListener("keydown", e => {
       if (e.key === "Enter") {
-        const message = freeInput.value.trim();
-        if (message) sendMessageFromAgent(message);
+        const msg = freeInput.value.trim();
+        if (msg) sendMessageFromAgent(msg);
       }
     });
   </script>
