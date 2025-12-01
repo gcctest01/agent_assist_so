@@ -21,10 +21,18 @@
       padding: 12px;
       max-height: 500px;
       overflow-y: auto;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
       white-space: pre-wrap;
       font-family: monospace;
     }
+    #typingIndicator {
+      font-family: monospace;
+      color: #555;
+      padding-left: 5px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
     #suggestionsList {
       border: 1px solid #ccc;
       border-radius: 6px;
@@ -43,6 +51,7 @@
     .suggestion-item:hover {
       background: #d0e1ff;
     }
+
     #inputContainer {
       margin-top: 20px;
       background: #fff;
@@ -70,7 +79,7 @@
       background: #0050b3;
     }
 
-    /** ⬇⬇⬇ TOGGLE IOS STYLE */
+    /* Toggle iOS style */
     .toggle-container {
       display: flex;
       align-items: center;
@@ -121,9 +130,11 @@
       font-weight: bold;
       display: none;
     }
+
     .positive { color: green; }
     .negative { color: red; }
-    .neutral { color: gray; }
+    .neutral  { color: gray; }
+
   </style>
 </head>
 
@@ -131,13 +142,13 @@
 
   <h2>Conversation avec l'Assistant Watson :</h2>
 
-  <!-- TOGGLE ANALYSE SENTIMENT -->
+  <!-- Toggle sentiment analysis -->
   <div class="toggle-container">
     <label class="toggle-switch">
       <input type="checkbox" id="sentimentToggle">
       <span class="slider"></span>
     </label>
-    <span>Activer l’analyse de sentiment</span>
+    <span>🔍 Activer l’analyse de sentiment</span>
   </div>
 
   <div id="globalSentiment">
@@ -145,6 +156,9 @@
   </div>
 
   <div id="messageContainer"></div>
+
+  <!-- Typing animation -->
+  <div id="typingIndicator"></div>
 
   <h3>Suggestions de réponses :</h3>
   <div id="suggestionsList">
@@ -163,56 +177,85 @@
     const freeInput = document.getElementById("freeInput");
     const sendBtn = document.getElementById("sendBtn");
     const globalSentiment = document.getElementById("globalSentiment");
+    const typingIndicator = document.getElementById("typingIndicator");
 
-    // 🔧 Toggle sentiment
+    /* Toggle sentiment */
     let sentimentAnalysisEnabled = false;
 
     document.getElementById("sentimentToggle").addEventListener("change", e => {
       sentimentAnalysisEnabled = e.target.checked;
-
-      // Masquer/afficher bloc sentiment
       globalSentiment.style.display = sentimentAnalysisEnabled ? "block" : "none";
     });
 
+    /* Client ID */
     let clientId = localStorage.getItem("clientId");
     if (!clientId) {
       clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       localStorage.setItem("clientId", clientId);
     }
 
+    /* Sentiment tracking */
     let conversationSentiment = 0;
     let userMessageCount = 0;
 
+    /* Append messages */
     function appendMessage(sender, message) {
-      messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
+      messageContainer.textContent += `${sender} :\n-----------------\n${message}\n\n`;
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
-    function updateGlobalSentiment(sentimentScore, isUserMessage) {
+    /* Sentiment update */
+    function updateGlobalSentiment(score, isUserMessage) {
       const weight = isUserMessage ? 2 : 1;
-      conversationSentiment = ((conversationSentiment * userMessageCount) + (sentimentScore * weight)) / (userMessageCount + weight);
+      conversationSentiment =
+        ((conversationSentiment * userMessageCount) + (score * weight)) /
+        (userMessageCount + weight);
+
       if (isUserMessage) userMessageCount++;
 
-      let sentimentText = "Sentiment global : Neutre ";
-      let sentimentClass = "neutral";
+      let text = "Sentiment global : Neutre ";
       let emoji = "😐";
+      let cls = "neutral";
 
       if (conversationSentiment > 0.5) {
-        sentimentText = "Sentiment global : Positif ";
-        sentimentClass = "positive";
+        text = "Sentiment global : Positif ";
         emoji = "😊";
+        cls = "positive";
       } else if (conversationSentiment < -0.5) {
-        sentimentText = "Sentiment global : Négatif ";
-        sentimentClass = "negative";
+        text = "Sentiment global : Négatif ";
         emoji = "😞";
+        cls = "negative";
       }
 
-      globalSentiment.textContent = `${sentimentText}${emoji}`;
-      globalSentiment.className = sentimentClass;
+      globalSentiment.className = cls;
+      globalSentiment.textContent = `${text}${emoji}`;
     }
 
+    /* --- Typing animation --- */
+    let typingInterval = null;
+
+    function startTypingIndicator() {
+      typingIndicator.style.display = "block";
+      let dots = 0;
+
+      typingIndicator.textContent = "Assistant Watson est en train d'écrire";
+
+      typingInterval = setInterval(() => {
+        dots = (dots + 1) % 5;
+        typingIndicator.textContent =
+          "Assistant Watson est en train d'écrire" + ".".repeat(dots);
+      }, 400);
+    }
+
+    function stopTypingIndicator() {
+      typingIndicator.style.display = "none";
+      clearInterval(typingInterval);
+    }
+
+    /* Fetch reply */
     async function getWatsonResponse(message, senderType) {
       try {
+
         const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -227,62 +270,63 @@
 
         const data = await res.json();
 
-        // Calcul du sentiment uniquement si activé
+        stopTypingIndicator(); // <<< stop animation
+
         if (sentimentAnalysisEnabled && data.sentiment !== undefined) {
           updateGlobalSentiment(data.sentiment, senderType === "user");
         }
 
         appendMessage("Assistant Watson", data.reply);
 
+        /* Suggestions */
         suggestionsList.innerHTML = "";
         let suggestions = [];
 
         if (Array.isArray(data.reply)) suggestions = data.reply;
-        else if (typeof data.reply === "string" && data.reply.trim()) suggestions = [data.reply];
+        else if (data.reply?.trim()) suggestions = [data.reply];
 
-        if (suggestions.length === 0) {
+        if (!suggestions.length) {
           suggestionsList.innerHTML = "<div>Aucune suggestion disponible.</div>";
         } else {
           suggestions.forEach(r => {
-            const div = document.createElement("div");
-            div.className = "suggestion-item";
-            div.textContent = r;
-            div.addEventListener("click", async () => {
-              try {
-                await navigator.clipboard.writeText(r);
-                alert("Texte copié !");
-              } catch (err) {
-                console.error("Erreur copie :", err);
-              }
-            });
-            suggestionsList.appendChild(div);
+            const d = document.createElement("div");
+            d.className = "suggestion-item";
+            d.textContent = r;
+            d.onclick = async () => {
+              await navigator.clipboard.writeText(r);
+              alert("Texte copié !");
+            };
+            suggestionsList.appendChild(d);
           });
         }
 
-      } catch (error) {
-        console.error("Erreur récupération Watsonx:", error);
+      } catch (err) {
+        console.error(err);
+        stopTypingIndicator();
         appendMessage("Assistant Watson", "Erreur lors de la récupération des suggestions.");
-        suggestionsList.innerHTML = "<div>Pas de suggestions disponibles.</div>";
       }
     }
 
+    /* Send user message */
     function sendMessageFromAgent(message) {
       appendMessage("Agent", message);
+      startTypingIndicator();  // <<< start animation
       getWatsonResponse(message, "agent");
       freeInput.value = "";
     }
 
-    sendBtn.addEventListener("click", () => {
+    sendBtn.onclick = () => {
       const msg = freeInput.value.trim();
       if (msg) sendMessageFromAgent(msg);
-    });
+    };
 
-    freeInput.addEventListener("keydown", e => {
+    freeInput.onkeydown = e => {
       if (e.key === "Enter") {
         const msg = freeInput.value.trim();
         if (msg) sendMessageFromAgent(msg);
       }
-    });
+    };
+
   </script>
 
 </body>
