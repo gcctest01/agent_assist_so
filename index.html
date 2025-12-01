@@ -80,8 +80,18 @@
     .neutral { color: gray; }
   </style>
 </head>
+
 <body>
+
   <h2>Conversation avec l'Assistant Watson :</h2>
+
+  <!-- 🔍 SWITCH ANALYSE SENTIMENT -->
+  <div style="margin-bottom: 15px;">
+    <label>
+      <input type="checkbox" id="sentimentToggle">
+      🔍 Activer l’analyse de sentiment
+    </label>
+  </div>
 
   <div id="globalSentiment">
     Sentiment global : Attente de début de la conversation 😐
@@ -107,14 +117,20 @@
     const sendBtn = document.getElementById("sendBtn");
     const globalSentiment = document.getElementById("globalSentiment");
 
+    // 🔧 Activation/désactivation du sentiment
+    let sentimentAnalysisEnabled = false;
+    document.getElementById("sentimentToggle").addEventListener("change", e => {
+      sentimentAnalysisEnabled = e.target.checked;
+    });
+
     let clientId = localStorage.getItem("clientId");
     if (!clientId) {
       clientId = "user-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       localStorage.setItem("clientId", clientId);
     }
 
-    let conversationSentiment = 0; // Sentiment global cumulé
-    let userMessageCount = 0; // Compteur de messages utilisateur
+    let conversationSentiment = 0;
+    let userMessageCount = 0;
 
     function appendMessage(sender, message) {
       messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
@@ -149,22 +165,28 @@
         const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: message, clientId })
+          body: JSON.stringify({
+            message,
+            clientId,
+            sentimentEnabled: sentimentAnalysisEnabled   // <<< 🔥 ENVOI DU SWITCH AU BACKEND
+          })
         });
 
         if (!res.ok) throw new Error("Erreur API Orchestrate");
 
         const data = await res.json();
 
-        // Assurer un score neutre si NLU a échoué
-        const sentimentScore = data.sentiment ?? 0;
-        updateGlobalSentiment(sentimentScore, senderType === "user");
+        // 🔥 Analyse seulement si activée
+        if (sentimentAnalysisEnabled && data.sentiment !== undefined) {
+          updateGlobalSentiment(data.sentiment, senderType === "user");
+        }
 
         appendMessage("Assistant Watson", data.reply);
 
-        // Gérer les suggestions
+        // Gestion des suggestions
         suggestionsList.innerHTML = "";
         let suggestions = [];
+
         if (Array.isArray(data.reply)) {
           suggestions = data.reply;
         } else if (typeof data.reply === "string" && data.reply.trim().length > 0) {
@@ -215,5 +237,6 @@
       }
     });
   </script>
+
 </body>
 </html>
