@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Assistant Agent Assist - Watsonx Orchestrate</title>
+
 <style>
 body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
 h2,h3 { color:#004080; }
@@ -13,11 +14,14 @@ h2,h3 { color:#004080; }
 .suggestion-item:hover { background:#d0e1ff; }
 #inputContainer { margin-top:20px; background:#fff; padding:12px; border-radius:6px; border:1px solid #ccc; }
 #freeInput { width:100%; padding:10px; border-radius:6px; border:1px solid #aaa; font-size:15px; }
-#sendBtn, #summaryBtn { margin-top:10px; padding:10px 18px; color:white; border:none; border-radius:6px; cursor:pointer; }
+#sendBtn, #summaryBtn, #hideSummaryBtn { margin-top:10px; padding:10px 18px; color:white; border:none; border-radius:6px; cursor:pointer; }
 #sendBtn { background:#004080; }
 #sendBtn:hover { background:#0050b3; }
 #summaryBtn { background:#0066cc; margin-left:10px; }
 #summaryBtn:hover { background:#0080ff; }
+#hideSummaryBtn { background:#777; margin-left:10px; }
+#hideSummaryBtn:hover { background:#555; }
+
 #globalSentiment { position:absolute; top:12px; right:20px; font-size:14px; font-weight:bold; display:none; }
 .positive { color:green; }
 .negative { color:red; }
@@ -33,26 +37,20 @@ input:checked + .slider:before { transform:translateX(22px); }
 
 #loadingDots { font-weight:bold; font-size:18px; margin-top:8px; min-height:24px; }
 
-/* Modal résumé */
-#summaryModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-#summaryContent { background:#fff; padding:20px; border-radius:10px; max-width:600px; max-height:80%; overflow-y:auto; }
-
-/* Style dédié à l'affichage du résumé (Markdown/HTML) */
-#summaryText {
+/* Résumé intégré */
+#summarySection {
+    display:none;
+    background:white;
+    padding:15px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin-top:20px;
     white-space: normal;
     line-height: 1.5;
-    font-size: 14px;
 }
-#summaryText h1, 
-#summaryText h2, 
-#summaryText h3 { color:#004080; margin-top:10px; }
-#summaryText ul { padding-left:20px; }
-#summaryText li { margin-bottom:4px; }
-
-#closeSummary { margin-top:10px; padding:8px 14px; background:#004080; color:white; border:none; border-radius:6px; cursor:pointer; }
-#closeSummary:hover { background:#0050b3; }
 </style>
 </head>
+
 <body>
 
 <h2>Conversation avec l'Assistant Watson :</h2>
@@ -66,6 +64,7 @@ Analyse de sentiment
 </label>
 
 <div id="globalSentiment">Sentiment global : Attente de début de la conversation 😐</div>
+
 <div id="messageContainer"></div>
 
 <h3>Suggestions de réponses :</h3>
@@ -75,17 +74,16 @@ Analyse de sentiment
 <div id="inputContainer">
 <label for="freeInput"><strong>Saisir un message :</strong></label>
 <input id="freeInput" type="text" placeholder="Écrire le message ici…">
+
 <button id="sendBtn">Envoyer</button>
-<button id="summaryBtn">Résumé</button>
+<button id="summaryBtn">Afficher le résumé</button>
+<button id="hideSummaryBtn" style="display:none;">Masquer</button>
 </div>
 
-<!-- Modal résumé -->
-<div id="summaryModal">
-<div id="summaryContent">
-<h3>Résumé de la conversation :</h3>
+<!-- Résumé sous le champ -->
+<div id="summarySection">
+<h3 style="color:#004080;">Résumé de la conversation :</h3>
 <div id="summaryText"></div>
-<button id="closeSummary">Fermer</button>
-</div>
 </div>
 
 <script>
@@ -94,12 +92,12 @@ const suggestionsList = document.getElementById("suggestionsList");
 const freeInput = document.getElementById("freeInput");
 const sendBtn = document.getElementById("sendBtn");
 const summaryBtn = document.getElementById("summaryBtn");
+const hideSummaryBtn = document.getElementById("hideSummaryBtn");
+const summarySection = document.getElementById("summarySection");
+const summaryText = document.getElementById("summaryText");
 const globalSentiment = document.getElementById("globalSentiment");
 const sentimentToggle = document.getElementById("sentimentToggle");
 const loadingDots = document.getElementById("loadingDots");
-const summaryModal = document.getElementById("summaryModal");
-const summaryText = document.getElementById("summaryText");
-const closeSummary = document.getElementById("closeSummary");
 
 let clientId = localStorage.getItem("clientId");
 if (!clientId) {
@@ -163,8 +161,12 @@ async function getWatsonResponse(message,senderType){
     else{
       suggestions.forEach(r=>{
         const div=document.createElement("div");
-        div.className="suggestion-item"; div.innerText = r;
-        div.addEventListener("click",async()=>{ try{ await navigator.clipboard.writeText(r); alert("Texte copié !"); } catch(err){ console.error(err); } });
+        div.className="suggestion-item"; 
+        div.innerText = r;
+        div.addEventListener("click",async()=>{
+          try{ await navigator.clipboard.writeText(r); alert("Texte copié !"); }
+          catch(err){ console.error(err); }
+        });
         suggestionsList.appendChild(div);
       });
     }
@@ -181,31 +183,52 @@ function sendMessageFromAgent(message){
   freeInput.value="";
 }
 
-sendBtn.addEventListener("click",()=>{ const message=freeInput.value.trim(); if(message) sendMessageFromAgent(message); });
-freeInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ const message=freeInput.value.trim(); if(message) sendMessageFromAgent(message); }});
+sendBtn.addEventListener("click",()=>{ 
+  const message=freeInput.value.trim();
+  if(message) sendMessageFromAgent(message);
+});
 
-// ---------------- Résumé ----------------
+freeInput.addEventListener("keydown",(e)=>{
+  if(e.key==="Enter"){
+    const message=freeInput.value.trim();
+    if(message) sendMessageFromAgent(message);
+  }
+});
+
+// ----------- Résumé intégré -----------
+
 summaryBtn.addEventListener("click", async ()=>{
+
   const interval = showLoadingAnimation();
   try{
     const res = await fetch("https://watsson-agent.onrender.com/api/summarize", {
-      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ clientId })
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ clientId })
     });
+
     clearInterval(interval); loadingDots.textContent="";
     if(!res.ok) throw new Error("Erreur API Summarizer");
+
     const data = await res.json();
 
-    // 👉 Correction : afficher le résumé en HTML formaté
     summaryText.innerHTML = data.summary;
+    summarySection.style.display = "block";
+    hideSummaryBtn.style.display = "inline-block";
+    summaryBtn.textContent = "Mettre à jour le résumé";
 
-    summaryModal.style.display = "flex";
   }catch(err){
     clearInterval(interval); loadingDots.textContent="";
     alert("Impossible de générer le résumé : " + err.message);
   }
 });
 
-closeSummary.addEventListener("click",()=>{ summaryModal.style.display="none"; });
+// Masquer le résumé
+hideSummaryBtn.addEventListener("click",()=>{
+  summarySection.style.display = "none";
+  hideSummaryBtn.style.display = "none";
+  summaryBtn.textContent = "Afficher le résumé";
+});
 </script>
 
 </body>
