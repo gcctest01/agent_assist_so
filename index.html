@@ -36,6 +36,19 @@ input:checked + .slider:before { transform:translateX(22px); }
 /* Modal résumé */
 #summaryModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
 #summaryContent { background:#fff; padding:20px; border-radius:10px; max-width:600px; max-height:80%; overflow-y:auto; }
+
+/* Style dédié à l'affichage du résumé (Markdown/HTML) */
+#summaryText {
+    white-space: normal;
+    line-height: 1.5;
+    font-size: 14px;
+}
+#summaryText h1, 
+#summaryText h2, 
+#summaryText h3 { color:#004080; margin-top:10px; }
+#summaryText ul { padding-left:20px; }
+#summaryText li { margin-bottom:4px; }
+
 #closeSummary { margin-top:10px; padding:8px 14px; background:#004080; color:white; border:none; border-radius:6px; cursor:pointer; }
 #closeSummary:hover { background:#0050b3; }
 </style>
@@ -181,7 +194,10 @@ summaryBtn.addEventListener("click", async ()=>{
     clearInterval(interval); loadingDots.textContent="";
     if(!res.ok) throw new Error("Erreur API Summarizer");
     const data = await res.json();
-    summaryText.textContent = data.summary;
+
+    // 👉 Correction : afficher le résumé en HTML formaté
+    summaryText.innerHTML = data.summary;
+
     summaryModal.style.display = "flex";
   }catch(err){
     clearInterval(interval); loadingDots.textContent="";
