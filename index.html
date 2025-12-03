@@ -1,196 +1,127 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Assistant Agent Assist - Watsonx Orchestrate</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
-h2,h3 { color:#004080; }
-#messageContainer { background:#fff; border:1px solid #ccc; border-radius:6px; padding:12px; max-height:500px; overflow-y:auto; margin-bottom:20px; white-space:pre-wrap; font-family:monospace; }
-#suggestionsList { border:1px solid #ccc; border-radius:6px; background:white; max-height:200px; overflow-y:auto; padding:8px; margin-bottom:10px; }
-.suggestion-item { padding:10px; border-bottom:1px solid #eee; cursor:pointer; color:#004080; white-space:pre-wrap; }
-.suggestion-item:hover { background:#d0e1ff; }
-#inputContainer { margin-top:20px; background:#fff; padding:12px; border-radius:6px; border:1px solid #ccc; }
-#freeInput { width:100%; padding:10px; border-radius:6px; border:1px solid #aaa; font-size:15px; }
-#sendBtn, #summaryBtn { margin-top:10px; padding:10px 18px; color:white; border:none; border-radius:6px; cursor:pointer; }
-#sendBtn { background:#004080; }
-#sendBtn:hover { background:#0050b3; }
-#summaryBtn { background:#0066cc; margin-left:10px; }
-#summaryBtn:hover { background:#0080ff; }
-#globalSentiment { position:absolute; top:12px; right:20px; font-size:14px; font-weight:bold; display:none; }
-.positive { color:green; }
-.negative { color:red; }
-.neutral { color:gray; }
+const express = require("express");
+const axios = require("axios");
+const { IamAuthenticator } = require("ibm-watson/auth");
+const NaturalLanguageUnderstandingV1 = require("ibm-watson/natural-language-understanding/v1");
+require("dotenv").config();
 
-/* Toggle switch */
-.switch { position:relative; display:inline-block; width:50px; height:28px; margin-left:10px; vertical-align:middle; }
-.switch input { display:none; }
-.slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:0.4s; border-radius:34px; }
-.slider:before { position:absolute; content:""; height:20px; width:20px; left:4px; bottom:4px; background:white; transition:0.4s; border-radius:50%; }
-input:checked + .slider { background-color:#004080; }
-input:checked + .slider:before { transform:translateX(22px); }
+const app = express();
+app.use(express.json());
 
-#loadingDots { font-weight:bold; font-size:18px; margin-top:8px; min-height:24px; }
-
-/* Modal résumé */
-#summaryModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-#summaryContent { background:#fff; padding:20px; border-radius:10px; max-width:600px; max-height:80%; overflow-y:auto; }
-#closeSummary { margin-top:10px; padding:8px 14px; background:#004080; color:white; border:none; border-radius:6px; cursor:pointer; }
-#closeSummary:hover { background:#0050b3; }
-</style>
-</head>
-<body>
-
-<h2>Conversation avec l'Assistant Watson :</h2>
-
-<label>
-Analyse de sentiment
-<div class="switch">
-<input type="checkbox" id="sentimentToggle">
-<span class="slider"></span>
-</div>
-</label>
-
-<div id="globalSentiment">Sentiment global : Attente de début de la conversation 😐</div>
-<div id="messageContainer"></div>
-
-<h3>Suggestions de réponses :</h3>
-<div id="suggestionsList"><div>Aucune suggestion pour le moment...</div></div>
-<div id="loadingDots"></div>
-
-<div id="inputContainer">
-<label for="freeInput"><strong>Saisir un message :</strong></label>
-<input id="freeInput" type="text" placeholder="Écrire le message ici…">
-<button id="sendBtn">Envoyer</button>
-<button id="summaryBtn">Résumé</button>
-</div>
-
-<!-- Modal résumé -->
-<div id="summaryModal">
-<div id="summaryContent">
-<h3>Résumé de la conversation :</h3>
-<div id="summaryText"></div>
-<button id="closeSummary">Fermer</button>
-</div>
-</div>
-
-<script>
-const messageContainer = document.getElementById("messageContainer");
-const suggestionsList = document.getElementById("suggestionsList");
-const freeInput = document.getElementById("freeInput");
-const sendBtn = document.getElementById("sendBtn");
-const summaryBtn = document.getElementById("summaryBtn");
-const globalSentiment = document.getElementById("globalSentiment");
-const sentimentToggle = document.getElementById("sentimentToggle");
-const loadingDots = document.getElementById("loadingDots");
-const summaryModal = document.getElementById("summaryModal");
-const summaryText = document.getElementById("summaryText");
-const closeSummary = document.getElementById("closeSummary");
-
-let clientId = localStorage.getItem("clientId");
-if (!clientId) {
-  clientId = "user-" + Date.now() + "-" + Math.floor(Math.random()*1000);
-  localStorage.setItem("clientId", clientId);
-}
-
-let conversationSentiment = 0;
-let userMessageCount = 0;
-let sentimentEnabled = false;
-
-sentimentToggle.addEventListener("change", () => {
-  sentimentEnabled = sentimentToggle.checked;
-  globalSentiment.style.display = sentimentEnabled ? "block" : "none";
+// ---------------- MIDDLEWARE CORS ----------------
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
+  res.setHeader("Access-Control-Allow-Credentials", "false");
+  res.setHeader("Access-Control-Max-Age", "7200");
+  next();
 });
 
-function appendMessage(sender,message){
-  messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
-  messageContainer.scrollTop = messageContainer.scrollHeight;
+// ---------------- TOKEN IAM ----------------
+let cachedToken = null;
+let tokenExpiry = 0;
+
+async function getIamToken() {
+  const now = Date.now() / 1000;
+  if (cachedToken && now < tokenExpiry - 60) return cachedToken;
+
+  const res = await axios.post(
+    "https://iam.platform.saas.ibm.com/siusermgr/api/1.0/apikeys/token",
+    { apikey: process.env.WXO_API_KEY },
+    { headers: { "Content-Type": "application/json" } }
+  );
+
+  cachedToken = res.data.token;
+  tokenExpiry = now + res.data.expires_in;
+  return cachedToken;
 }
 
-function updateGlobalSentiment(sentimentScore,isUserMessage){
-  if(!sentimentEnabled) return;
-  const weight = isUserMessage?2:1;
-  conversationSentiment = ((conversationSentiment*userMessageCount)+(sentimentScore*weight))/(userMessageCount+weight);
-  if(isUserMessage) userMessageCount++;
-  let sentimentText="Sentiment global : Neutre ", sentimentClass="neutral", emoji="😐";
-  if(conversationSentiment>0.5){ sentimentText="Sentiment global : Positif "; sentimentClass="positive"; emoji="😊"; }
-  else if(conversationSentiment<-0.5){ sentimentText="Sentiment global : Négatif "; sentimentClass="negative"; emoji="😞"; }
-  globalSentiment.textContent = `${sentimentText}${emoji}`;
-  globalSentiment.className = sentimentClass;
+// ---------------- CONFIGURATION WATSON NLU ----------------
+const nlu = new NaturalLanguageUnderstandingV1({
+  version: '2021-08-01',
+  authenticator: new IamAuthenticator({ apikey: process.env.WATSON_NLU_API_KEY }),
+  serviceUrl: process.env.WATSON_NLU_URL,
+});
+
+// ---------------- THREADS ----------------
+const threads = {}; // threads[clientId] = { messages: [], threadId: "" }
+
+// ---------------- ANALYSE DU SENTIMENT ----------------
+async function analyzeSentiment(message) {
+  try {
+    if (!message || message.trim().length === 0) return 0;
+    const analyzeParams = { text: message, features: { sentiment: {} } };
+    const analysis = await nlu.analyze(analyzeParams);
+    return analysis.result.sentiment.document.score || 0;
+  } catch (err) {
+    console.warn("NLU failed, sentiment neutralized:", err.message);
+    return 0;
+  }
 }
 
-function showLoadingAnimation(){
-  let dots = 0;
-  loadingDots.textContent = "";
-  const interval = setInterval(()=>{ dots=(dots+1)%4; loadingDots.textContent=".".repeat(dots); }, 500);
-  return interval;
-}
+// ---------------- ENDPOINT ORCHESTRATE ----------------
+app.post("/api/sendToOrchestrate", async (req, res) => {
+  try {
+    const { message, clientId, sentimentEnabled } = req.body;
+    if (!message || !clientId) return res.status(400).json({ error: "Message ou clientId manquant" });
 
-async function getWatsonResponse(message,senderType){
-  const interval = showLoadingAnimation();
-  try{
-    const res = await fetch("https://watsson-agent.onrender.com/api/sendToOrchestrate",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ message, clientId, sentimentEnabled })
-    });
-    if(!res.ok) throw new Error("Erreur API Orchestrate");
-    const data = await res.json();
-    clearInterval(interval); loadingDots.textContent="";
-    updateGlobalSentiment(data.sentiment, senderType==="user");
-    appendMessage("Assistant Watson", data.reply);
+    const token = await getIamToken();
+    if (!threads[clientId]) threads[clientId] = { messages: [], threadId: null };
 
-    // Suggestions
-    suggestionsList.innerHTML="";
-    let suggestions=[];
-    if(Array.isArray(data.reply)) suggestions=data.reply;
-    else if(typeof data.reply==="string" && data.reply.trim()) suggestions=[data.reply];
-    if(suggestions.length===0) suggestionsList.innerHTML="<div>Aucune suggestion disponible.</div>";
-    else{
-      suggestions.forEach(r=>{
-        const div=document.createElement("div");
-        div.className="suggestion-item"; div.innerText = r;
-        div.addEventListener("click",async()=>{ try{ await navigator.clipboard.writeText(r); alert("Texte copié !"); } catch(err){ console.error(err); } });
-        suggestionsList.appendChild(div);
-      });
+    threads[clientId].messages.push({ role: "user", content: message });
+
+    let sentimentScore = 0;
+    if (sentimentEnabled) sentimentScore = await analyzeSentiment(message);
+
+    const url = `${process.env.WXO_API_ENDPOINT}/v1/orchestrate/${process.env.WXO_AGENT_ID}/chat/completions`;
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    if (threads[clientId].threadId) headers["X-IBM-THREAD-ID"] = threads[clientId].threadId;
+
+    const response = await axios.post(url, { stream: false, messages: threads[clientId].messages }, { headers });
+
+    const botResponse = response.data.choices?.[0]?.message?.content || "Pas de réponse du bot.";
+    if (response.data.thread_id) threads[clientId].threadId = response.data.thread_id;
+
+    threads[clientId].messages.push({ role: "assistant", content: botResponse });
+
+    res.json({ reply: botResponse, sentiment: sentimentScore });
+
+  } catch (error) {
+    console.error("Erreur API Orchestrate:", error.response?.data || error.message);
+    res.status(500).json({ error: "Erreur API Orchestrate" });
+  }
+});
+
+// ---------------- ENDPOINT SUMMARIZE ----------------
+app.post("/api/summarize", async (req, res) => {
+  try {
+    const { clientId } = req.body;
+    if (!clientId || !threads[clientId] || threads[clientId].messages.length === 0) {
+      return res.status(400).json({ summary: "Aucune conversation trouvée pour ce client." });
     }
-  }catch(error){
-    clearInterval(interval); loadingDots.textContent="";
-    appendMessage("Assistant Watson","Erreur lors de la récupération des suggestions.");
-    suggestionsList.innerHTML="<div>Pas de suggestions disponibles.</div>";
-  }
-}
 
-function sendMessageFromAgent(message){
-  appendMessage("Agent",message);
-  getWatsonResponse(message,"agent");
-  freeInput.value="";
-}
+    const token = await getIamToken();
+    const url = `${process.env.WXO_API_ENDPOINT}/v1/orchestrate/${process.env.WXO_AGENT_SUM_ID}/chat/completions`;
 
-sendBtn.addEventListener("click",()=>{ const message=freeInput.value.trim(); if(message) sendMessageFromAgent(message); });
-freeInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ const message=freeInput.value.trim(); if(message) sendMessageFromAgent(message); }});
+    const conversationText = threads[clientId].messages.map(m => `${m.role.toUpperCase()} :\n${m.content}`).join("\n\n");
 
-// ---------------- Résumé ----------------
-summaryBtn.addEventListener("click", async ()=>{
-  const interval = showLoadingAnimation();
-  try{
-    const res = await fetch("https://watsson-agent.onrender.com/api/summarize", {
-      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ clientId })
-    });
-    clearInterval(interval); loadingDots.textContent="";
-    if(!res.ok) throw new Error("Erreur API Summarizer");
-    const data = await res.json();
-    summaryText.textContent = data.summary;
-    summaryModal.style.display = "flex";
-  }catch(err){
-    clearInterval(interval); loadingDots.textContent="";
-    alert("Impossible de générer le résumé : " + err.message);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const response = await axios.post(url, { stream: false, messages: [{ role: "user", content: conversationText }] }, { headers });
+
+    const summary = response.data.choices?.[0]?.message?.content || "Impossible de générer le résumé.";
+    res.json({ summary });
+
+  } catch (err) {
+    console.error("Erreur summarize:", err.response?.data || err.message);
+    res.status(500).json({ summary: "Erreur lors de la génération du résumé." });
   }
 });
 
-closeSummary.addEventListener("click",()=>{ summaryModal.style.display="none"; });
-</script>
+// ---------------- HEALTH ----------------
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
-</body>
-</html>
+// ---------------- SERVER START ----------------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+});
