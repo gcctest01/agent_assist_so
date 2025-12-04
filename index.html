@@ -7,7 +7,16 @@
 
 <style>
 body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
-h2,h3 { color:#004080; }
+h2,h3,label strong { color:#004080; font-size:16px; }
+
+/* ----------- TITRE DE SECTION (encadré type "Saisir un message :") ----------- */
+.section-title {
+    font-weight:bold;
+    font-size:16px;
+    color:#004080;
+    margin-bottom:6px;
+    display:block;
+}
 
 /* ----------- Zone historique (250px fixe + scroll) ----------- */
 #messageContainer {
@@ -59,6 +68,7 @@ h2,h3 { color:#004080; }
     border:1px solid #aaa; 
     font-size:15px; 
 }
+
 #sendBtn, #summaryBtn, #generateSummaryBtn, #hideSummaryBtn { 
     margin-top:10px; 
     padding:10px 18px; 
@@ -121,7 +131,7 @@ h2,h3 { color:#004080; }
 input:checked + .slider { background-color:#004080; }
 input:checked + .slider:before { transform:translateX(18px); }
 
-/* ----------- Résumé ----------- */
+/* ----------- Résumé (même style que la zone historique) ----------- */
 #summarySection {
     display:none;
     background:#fff;
@@ -135,7 +145,7 @@ input:checked + .slider:before { transform:translateX(18px); }
     max-height:300px;
     overflow-y:auto;
 
-    margin-top:20px;
+    margin-top:10px;
 }
 
 #loadingDots { 
@@ -161,25 +171,30 @@ Analyse de sentiment
 
 <div id="globalSentiment">Sentiment global : Attente de début de la conversation 😐</div>
 
+<!--  TITRE DE LA ZONE HISTORIQUE -->
+<span class="section-title">Transcript de la conversation :</span>
 <div id="messageContainer"></div>
 
-<h3>Suggestion de réponse :</h3>
+<!--  TITRE DES SUGGESTIONS -->
+<span class="section-title">Suggestion de réponse :</span>
 <div id="suggestionsList"><div>Aucune suggestion pour le moment...</div></div>
+
 <div id="loadingDots"></div>
 
 <div id="inputContainer">
-<label for="freeInput"><strong>Saisir un message :</strong></label>
-<input id="freeInput" type="text" placeholder="Écrire le message ici…">
+    <label for="freeInput" class="section-title">Saisir un message :</label>
+    <input id="freeInput" type="text" placeholder="Écrire le message ici…">
 
-<button id="sendBtn">Envoyer</button>
-<button id="summaryBtn">Afficher le résumé</button>
-<button id="generateSummaryBtn">Générer un nouveau résumé</button>
-<button id="hideSummaryBtn">Masquer</button>
+    <button id="sendBtn">Envoyer</button>
+    <button id="summaryBtn">Afficher le résumé</button>
+    <button id="generateSummaryBtn">Générer un nouveau résumé</button>
+    <button id="hideSummaryBtn">Masquer</button>
 </div>
 
-<!-- Résumé -->
+<!--  TITRE DE LA ZONE RÉSUMÉ -->
+<span class="section-title" style="display:none;" id="summaryTitle">Résumé de la conversation :</span>
+
 <div id="summarySection">
-<h3 style="color:#004080;">Résumé de la conversation :</h3>
 <div id="summaryText"></div>
 </div>
 
@@ -193,6 +208,7 @@ const generateSummaryBtn = document.getElementById("generateSummaryBtn");
 const hideSummaryBtn = document.getElementById("hideSummaryBtn");
 const summarySection = document.getElementById("summarySection");
 const summaryText = document.getElementById("summaryText");
+const summaryTitle = document.getElementById("summaryTitle");
 const globalSentiment = document.getElementById("globalSentiment");
 const sentimentToggle = document.getElementById("sentimentToggle");
 const loadingDots = document.getElementById("loadingDots");
@@ -207,16 +223,19 @@ let conversationSentiment = 0;
 let userMessageCount = 0;
 let sentimentEnabled = false;
 
+/* ----- Sentiment toggle ----- */
 sentimentToggle.addEventListener("change", () => {
   sentimentEnabled = sentimentToggle.checked;
   globalSentiment.style.display = sentimentEnabled ? "block" : "none";
 });
 
+/* ----- Ajout message ----- */
 function appendMessage(sender,message){
   messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
+/* ----- Sentiment global ----- */
 function updateGlobalSentiment(sentimentScore,isUserMessage){
   if(!sentimentEnabled) return;
   const weight = isUserMessage?2:1;
@@ -236,6 +255,7 @@ function showLoadingAnimation(){
   return interval;
 }
 
+/* ----- Réponse Watson ----- */
 async function getWatsonResponse(message,senderType){
   const interval = showLoadingAnimation();
   try{
@@ -250,7 +270,7 @@ async function getWatsonResponse(message,senderType){
     updateGlobalSentiment(data.sentiment, senderType==="user");
     appendMessage("Assistant Watson", data.reply);
 
-    // Suggestions
+    /* ----- Suggestions ----- */
     suggestionsList.innerHTML="";
     let suggestions=[];
     if(Array.isArray(data.reply)) suggestions=data.reply;
@@ -281,7 +301,7 @@ function sendMessageFromAgent(message){
   freeInput.value="";
 }
 
-/* ----------- Envoi message ----------- */
+/* ----- Envoi message ----- */
 sendBtn.addEventListener("click",()=>{ 
   const message=freeInput.value.trim();
   if(message) sendMessageFromAgent(message);
@@ -293,13 +313,14 @@ freeInput.addEventListener("keydown",(e)=>{
   }
 });
 
-/* ----------- Afficher résumé (ne recharge plus) ----------- */
+/* ----- Afficher résumé ----- */
 summaryBtn.addEventListener("click", ()=>{
     summarySection.style.display = "block";
+    summaryTitle.style.display = "block";
     hideSummaryBtn.style.display = "inline-block";
 });
 
-/* ----------- Générer un nouveau résumé ----------- */
+/* ----- Générer un résumé ----- */
 generateSummaryBtn.addEventListener("click", async ()=>{
     const interval = showLoadingAnimation();
 
@@ -317,8 +338,9 @@ generateSummaryBtn.addEventListener("click", async ()=>{
 
         const data = await res.json();
 
-        summaryText.innerHTML = data.summary;   // <-- nouveau résumé !
+        summaryText.innerHTML = data.summary;
         summarySection.style.display = "block";
+        summaryTitle.style.display = "block";
         hideSummaryBtn.style.display = "inline-block";
 
     }catch(err){
@@ -328,9 +350,10 @@ generateSummaryBtn.addEventListener("click", async ()=>{
     }
 });
 
-/* ----------- Masquer le résumé ----------- */
+/* ----- Masquer résumé ----- */
 hideSummaryBtn.addEventListener("click",()=>{
   summarySection.style.display = "none";
+  summaryTitle.style.display = "none";
   hideSummaryBtn.style.display = "none";
 });
 </script>
