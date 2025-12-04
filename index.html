@@ -7,18 +7,29 @@
 
 <style>
 body { font-family: Arial, sans-serif; margin: 12px; background: #f9f9f9; }
-h2,h3,label strong { color:#004080; font-size:16px; }
 
-/* ----------- TITRE DE SECTION (encadré type "Saisir un message :") ----------- */
+/* Titre principal */
+h2 { 
+    color:#004080; 
+    font-size:26px; 
+    margin-bottom:24px; 
+}
+
+h3,label strong { 
+    color:#004080; 
+    font-size:16px; 
+}
+
+/* Titres de sections */
 .section-title {
     font-weight:bold;
     font-size:16px;
     color:#004080;
-    margin-bottom:6px;
+    margin:20px 0 6px 0;
     display:block;
 }
 
-/* ----------- Zone historique (250px fixe + scroll) ----------- */
+/* ----------- Zone historique ----------- */
 #messageContainer {
     background:#fff;
     border:1px solid #ccc;
@@ -61,6 +72,7 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     border-radius:6px; 
     border:1px solid #ccc; 
 }
+
 #freeInput { 
     width:100%; 
     padding:10px; 
@@ -69,22 +81,25 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     font-size:15px; 
 }
 
-#sendBtn, #summaryBtn, #generateSummaryBtn, #hideSummaryBtn { 
+/* ----------- Boutons ----------- */
+#sendBtn, #generateSummaryBtn, #toggleSummaryBtn { 
     margin-top:10px; 
     padding:10px 18px; 
     color:white; 
     border:none; 
     border-radius:6px; 
-    cursor:pointer; 
+    cursor:pointer;
+    display:inline-block;
 }
+
 #sendBtn { background:#004080; }
 #sendBtn:hover { background:#0050b3; }
-#summaryBtn { background:#0066cc; margin-left:10px; }
-#summaryBtn:hover { background:#0080ff; }
+
 #generateSummaryBtn { background:#00994d; margin-left:10px; }
 #generateSummaryBtn:hover { background:#00b35c; }
-#hideSummaryBtn { background:#777; margin-left:10px; display:none; }
-#hideSummaryBtn:hover { background:#555; }
+
+#toggleSummaryBtn { background:#0066cc; margin-left:10px; }
+#toggleSummaryBtn:hover { background:#0080ff; }
 
 /* ----------- Sentiment global ----------- */
 #globalSentiment { 
@@ -95,11 +110,12 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     font-weight:bold; 
     display:none; 
 }
+
 .positive { color:green; }
 .negative { color:red; }
 .neutral { color:gray; }
 
-/* ----------- Toggle switch (réduit) ----------- */
+/* ----------- Toggle switch ----------- */
 .switch { 
     position:relative; 
     display:inline-block; 
@@ -108,7 +124,9 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     margin-left:10px; 
     vertical-align:middle; 
 }
+
 .switch input { display:none; }
+
 .slider { 
     position:absolute; 
     cursor:pointer; 
@@ -117,6 +135,7 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     transition:0.4s; 
     border-radius:20px; 
 }
+
 .slider:before { 
     position:absolute; 
     content:""; 
@@ -128,10 +147,11 @@ h2,h3,label strong { color:#004080; font-size:16px; }
     transition:0.4s; 
     border-radius:50%; 
 }
+
 input:checked + .slider { background-color:#004080; }
 input:checked + .slider:before { transform:translateX(18px); }
 
-/* ----------- Résumé (même style que la zone historique) ----------- */
+/* ----------- Résumé ----------- */
 #summarySection {
     display:none;
     background:#fff;
@@ -145,7 +165,7 @@ input:checked + .slider:before { transform:translateX(18px); }
     max-height:300px;
     overflow-y:auto;
 
-    margin-top:10px;
+    margin-top:20px;
 }
 
 #loadingDots { 
@@ -171,11 +191,11 @@ Analyse de sentiment
 
 <div id="globalSentiment">Sentiment global : Attente de début de la conversation 😐</div>
 
-<!--  TITRE DE LA ZONE HISTORIQUE -->
+<!-- TITRE HISTORIQUE -->
 <span class="section-title">Transcript de la conversation :</span>
 <div id="messageContainer"></div>
 
-<!--  TITRE DES SUGGESTIONS -->
+<!-- TITRE SUGGESTIONS -->
 <span class="section-title">Suggestion de réponse :</span>
 <div id="suggestionsList"><div>Aucune suggestion pour le moment...</div></div>
 
@@ -186,33 +206,35 @@ Analyse de sentiment
     <input id="freeInput" type="text" placeholder="Écrire le message ici…">
 
     <button id="sendBtn">Envoyer</button>
-    <button id="summaryBtn">Afficher le résumé</button>
-    <button id="generateSummaryBtn">Générer un nouveau résumé</button>
-    <button id="hideSummaryBtn">Masquer</button>
+    <button id="generateSummaryBtn">Générer un résumé</button>
+    <button id="toggleSummaryBtn">Afficher le résumé</button>
 </div>
 
-<!--  TITRE DE LA ZONE RÉSUMÉ -->
+<!-- TITRE RÉSUMÉ -->
 <span class="section-title" style="display:none;" id="summaryTitle">Résumé de la conversation :</span>
-
 <div id="summarySection">
-<div id="summaryText"></div>
+    <div id="summaryText"></div>
 </div>
 
 <script>
+/* DOM */
 const messageContainer = document.getElementById("messageContainer");
 const suggestionsList = document.getElementById("suggestionsList");
 const freeInput = document.getElementById("freeInput");
+
 const sendBtn = document.getElementById("sendBtn");
-const summaryBtn = document.getElementById("summaryBtn");
 const generateSummaryBtn = document.getElementById("generateSummaryBtn");
-const hideSummaryBtn = document.getElementById("hideSummaryBtn");
+const toggleSummaryBtn = document.getElementById("toggleSummaryBtn");
+
 const summarySection = document.getElementById("summarySection");
-const summaryText = document.getElementById("summaryText");
 const summaryTitle = document.getElementById("summaryTitle");
+const summaryText = document.getElementById("summaryText");
+
 const globalSentiment = document.getElementById("globalSentiment");
 const sentimentToggle = document.getElementById("sentimentToggle");
 const loadingDots = document.getElementById("loadingDots");
 
+/* Gestion ID client */
 let clientId = localStorage.getItem("clientId");
 if (!clientId) {
   clientId = "user-" + Date.now() + "-" + Math.floor(Math.random()*1000);
@@ -223,19 +245,18 @@ let conversationSentiment = 0;
 let userMessageCount = 0;
 let sentimentEnabled = false;
 
-/* ----- Sentiment toggle ----- */
+/* ----- Toggle sentiment ----- */
 sentimentToggle.addEventListener("change", () => {
   sentimentEnabled = sentimentToggle.checked;
   globalSentiment.style.display = sentimentEnabled ? "block" : "none";
 });
 
-/* ----- Ajout message ----- */
+/* ----- Affichage messages ----- */
 function appendMessage(sender,message){
   messageContainer.textContent += sender + " :\n-----------------\n" + message + "\n\n";
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
-/* ----- Sentiment global ----- */
 function updateGlobalSentiment(sentimentScore,isUserMessage){
   if(!sentimentEnabled) return;
   const weight = isUserMessage?2:1;
@@ -255,7 +276,7 @@ function showLoadingAnimation(){
   return interval;
 }
 
-/* ----- Réponse Watson ----- */
+/* ----- Appel Watson ----- */
 async function getWatsonResponse(message,senderType){
   const interval = showLoadingAnimation();
   try{
@@ -264,34 +285,37 @@ async function getWatsonResponse(message,senderType){
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ message, clientId, sentimentEnabled })
     });
-    if(!res.ok) throw new Error("Erreur API Orchestrate");
+
+    if(!res.ok) throw new Error("Erreur API");
+
     const data = await res.json();
     clearInterval(interval); loadingDots.textContent="";
     updateGlobalSentiment(data.sentiment, senderType==="user");
     appendMessage("Assistant Watson", data.reply);
 
-    /* ----- Suggestions ----- */
     suggestionsList.innerHTML="";
     let suggestions=[];
     if(Array.isArray(data.reply)) suggestions=data.reply;
     else if(typeof data.reply==="string" && data.reply.trim()) suggestions=[data.reply];
-    if(suggestions.length===0) suggestionsList.innerHTML="<div>Aucune suggestion disponible.</div>";
-    else{
-      suggestions.forEach(r=>{
-        const div=document.createElement("div");
-        div.className="suggestion-item"; 
-        div.innerText = r;
-        div.addEventListener("click",async()=>{
-          try{ await navigator.clipboard.writeText(r); alert("Texte copié !"); }
-          catch(err){ console.error(err); }
+
+    if(suggestions.length===0){
+        suggestionsList.innerHTML="<div>Aucune suggestion disponible.</div>";
+    } else {
+        suggestions.forEach(r=>{
+            const div=document.createElement("div");
+            div.className="suggestion-item"; 
+            div.innerText = r;
+            div.addEventListener("click",async()=>{
+              try{ await navigator.clipboard.writeText(r); alert("Texte copié !"); }
+              catch(err){ console.error(err); }
+            });
+            suggestionsList.appendChild(div);
         });
-        suggestionsList.appendChild(div);
-      });
     }
+
   }catch(error){
     clearInterval(interval); loadingDots.textContent="";
     appendMessage("Assistant Watson","Erreur lors de la récupération des suggestions.");
-    suggestionsList.innerHTML="<div>Pas de suggestions disponibles.</div>";
   }
 }
 
@@ -301,7 +325,7 @@ function sendMessageFromAgent(message){
   freeInput.value="";
 }
 
-/* ----- Envoi message ----- */
+/* ----- Bouton envoyer ----- */
 sendBtn.addEventListener("click",()=>{ 
   const message=freeInput.value.trim();
   if(message) sendMessageFromAgent(message);
@@ -311,13 +335,6 @@ freeInput.addEventListener("keydown",(e)=>{
     const message=freeInput.value.trim();
     if(message) sendMessageFromAgent(message);
   }
-});
-
-/* ----- Afficher résumé ----- */
-summaryBtn.addEventListener("click", ()=>{
-    summarySection.style.display = "block";
-    summaryTitle.style.display = "block";
-    hideSummaryBtn.style.display = "inline-block";
 });
 
 /* ----- Générer un résumé ----- */
@@ -331,30 +348,39 @@ generateSummaryBtn.addEventListener("click", async ()=>{
             body: JSON.stringify({ clientId })
         });
 
-        clearInterval(interval); 
+        clearInterval(interval);
         loadingDots.textContent="";
-
-        if(!res.ok) throw new Error("Erreur API Summarizer");
 
         const data = await res.json();
 
         summaryText.innerHTML = data.summary;
         summarySection.style.display = "block";
         summaryTitle.style.display = "block";
-        hideSummaryBtn.style.display = "inline-block";
+
+        toggleSummaryBtn.textContent = "Masquer le résumé";
 
     }catch(err){
-        clearInterval(interval); 
+        clearInterval(interval);
         loadingDots.textContent="";
-        alert("Impossible de générer le résumé : " + err.message);
+        alert("Erreur lors du résumé : " + err.message);
     }
 });
 
-/* ----- Masquer résumé ----- */
-hideSummaryBtn.addEventListener("click",()=>{
-  summarySection.style.display = "none";
-  summaryTitle.style.display = "none";
-  hideSummaryBtn.style.display = "none";
+/* ----- Toggle Afficher / Masquer résumé ----- */
+toggleSummaryBtn.addEventListener("click", ()=>{
+
+    const isVisible = summarySection.style.display === "block";
+
+    if (isVisible) {
+        summarySection.style.display = "none";
+        summaryTitle.style.display = "none";
+        toggleSummaryBtn.textContent = "Afficher le résumé";
+    } else {
+        summarySection.style.display = "block";
+        summaryTitle.style.display = "block";
+        toggleSummaryBtn.textContent = "Masquer le résumé";
+    }
+
 });
 </script>
 
