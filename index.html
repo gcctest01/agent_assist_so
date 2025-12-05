@@ -384,5 +384,77 @@ toggleSummaryBtn.addEventListener("click", ()=>{
 });
 </script>
 
+<!-- =============================================== -->
+<!--  MODULE D’INTÉGRATION DU CLIENT VIA LE SDK      -->
+<!-- =============================================== -->
+
+<script type="text/javascript" src="https://sfrrec00-sfrvalid.sfrtestglobalcc.com/OneAgentWeb/js/agentsdk/oneagentSDK.js"></script>
+
+<script>
+(function() {
+
+  console.log("Initialisation du module SDK client…");
+
+  /* ---------------------------------------------------
+     1. Instanciation SDK
+  --------------------------------------------------- */
+  let api;
+
+  try {
+    if (typeof getAgentAPI === "function") {
+      api = getAgentAPI();
+      console.log("SDK chargé via getAgentAPI()");
+    } 
+    else if (typeof oneAgentSDK === "function") {
+      api = new oneAgentSDK();
+      console.log("SDK chargé via new oneAgentSDK()");
+    }
+    else {
+      console.error("SDK OneAgent non disponible.");
+    }
+  } catch(err) {
+    console.error("Erreur SDK :", err);
+  }
+
+
+  /* ---------------------------------------------------
+     2. Fonction d’intégration du message client
+  --------------------------------------------------- */
+  function handleClientMessage(clientName, messageText) {
+
+    appendMessage(clientName, messageText);
+
+    getWatsonResponse(messageText, "client");
+
+    console.log("Message client transmis à Watson :", messageText);
+  }
+
+
+  /* ---------------------------------------------------
+     3. Écoute des messages client → Assistant
+  --------------------------------------------------- */
+  if (api) {
+
+    api.onCallMessageReceived = function(event) {
+      console.log("Message reçu via SDK :", event);
+
+      const call = event.Call || {};
+      const clientName = call.IMDisplayName || "Client";
+      const messageText = call.IMMessage || "";
+
+      if (!messageText.trim()) {
+        console.warn("Message client vide.");
+        return;
+      }
+
+      handleClientMessage(clientName, messageText);
+    };
+
+    console.log("Écoute SDK activée : onCallMessageReceived");
+  }
+
+})();
+</script>
+
 </body>
 </html>
